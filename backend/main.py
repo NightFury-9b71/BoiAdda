@@ -1,21 +1,34 @@
-from typing import Optional, List, Union
+from typing import Optional, List
 from datetime import datetime, timedelta
-from enum import Enum
+import logging
+import time
 
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from sqlmodel import SQLModel, Field, Relationship, Session, create_engine, select
+from fastapi.responses import JSONResponse
+from sqlmodel import SQLModel, Session, create_engine, select
+from pydantic import BaseModel
 
 from models import *
+from config import settings
+from security import get_password_hash, verify_password, create_access_token, get_current_user_id
+from logging_config import setup_logging
+
+# ===== LOGGING SETUP =====
+logger = setup_logging()
 
 # ===== DB SETUP =====
 
-DATABASE_URL = "sqlite:///./library.db"
-engine = create_engine(DATABASE_URL, echo=False)
+# Use environment-based database URL
+engine = create_engine(
+    settings.DATABASE_URL,
+    echo=settings.DEBUG,
+    connect_args={"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
+)
 
 def create_tables():
-    SQLModel.metadata.drop_all(engine)  # Drop existing tables
-    SQLModel.metadata.create_all(engine)  # Create new tables
+    # Safe table creation - only create if doesn't exist
+    SQLModel.metadata.create_all(engine)
 
 def get_db():
     with Session(engine) as session:
@@ -28,7 +41,7 @@ def populate_sample_data():
         # Create roles first
         roles = [
             Role(id=1, role_name=RoleType.ADMIN, description="Administrator"),
-            Role(id=2, role_name=RoleType.USER, description="Moderator"),  # You might want to add MODERATOR to enum
+            Role(id=2, role_name=RoleType.USER, description="Moderator"),
             Role(id=3, role_name=RoleType.USER, description="Regular User"),
         ]
         
@@ -36,60 +49,16 @@ def populate_sample_data():
             session.add(role)
         session.commit()
         
-        # Create sample users
+        # Create sample users with hashed passwords
         sample_users = [
-            # Admins
-            User(
-                name="আদিয়াত হোসেন (অ্যাডমিন)",
-                email="adiyat_admin@example.com",
-                phone="01711110001",
-                password="adminpass1",
-                role_id=1
-            ),
-            # Moderators
-            User(
-                name="সাবিনা ইয়াসমিন (মডারেটর)",
-                email="sabina_mod@example.com",
-                phone="01733330003",
-                password="modpass1",
-                role_id=2
-            ),
-            # Regular Users
-            User(
-                name="রহিম উদ্দিন",
-                email="rahim@example.com",
-                phone="01722220002",
-                password="userpass1",
-                role_id=3
-            ),
-            User(
-                name="তানভীর আহমেদ",
-                email="tanvir@example.com",
-                phone="01744440004",
-                password="userpass2",
-                role_id=3
-            ),
-            User(
-                name="মাহিরা ইসলাম",
-                email="mahera@example.com",
-                phone="01755550005",
-                password="userpass3",
-                role_id=3
-            ),
-            User(
-                name="রুশদী হাসান",
-                email="rushdi@example.com",
-                phone="01766660006",
-                password="userpass4",
-                role_id=3
-            ),
-            User(
-                name="লতিফা নাসরিন",
-                email="latifa@example.com",
-                phone="01777770007",
-                password="userpass5",
-                role_id=3
-            ),
+            User(name="আদিয়াত হোসেন (অ্যাডমিন)", email="adiyat_admin@example.com", phone="01711110001", password=get_password_hash("adminpass1"), role_id=1),
+            User(name="সাবিনা ইয়াসমিন (মডারেটর)", email="sabina_mod@example.com", phone="01733330003", password=get_password_hash("modpass1"), role_id=2),
+            User(name="রহিম উদ্দিন", email="rahim@example.com", phone="01722220002", password=get_password_hash("userpass1"), role_id=3),
+            User(name="তানভীর আহমেদ", email="tanvir@example.com", phone="01744440004", password=get_password_hash("userpass2"), role_id=3),
+            User(name="মাহিরা ইসলাম", email="mahera@example.com", phone="01755550005", password=get_password_hash("userpass3"), role_id=3),
+            User(name="রুশদী হাসান", email="rushdi@example.com", phone="01766660006", password=get_password_hash("userpass4"), role_id=3),
+            User(name="লতিফা নাসরিন", email="latifa@example.com", phone="01777770007", password=get_password_hash("userpass5"), role_id=3),
+            User(name="Demo User", email="demo@boiadda.com", phone="01700000000", password=get_password_hash("Demo123456"), role_id=3),
         ]
         
         for user in sample_users:
@@ -98,60 +67,12 @@ def populate_sample_data():
         
         # Create sample books
         sample_books = [
-            Book(
-                title="আজব দুনিয়া",
-                author="মুহম্মদ জাফর ইকবাল",
-                isbn="9789848000001",
-                cover_img="book1.png",
-                description="বিজ্ঞান ও কল্পনার এক অসাধারণ মিশেল।",
-                category="বিজ্ঞান কল্পকাহিনি",
-                donor_id=1
-            ),
-            Book(
-                title="হিমু",
-                author="হুমায়ূন আহমেদ",
-                isbn="9789848000002",
-                cover_img="book2.png",
-                description="হিমু চরিত্রের কল্পনাজাত মজার কাহিনী।",
-                category="উপন্যাস",
-                donor_id=3
-            ),
-            Book(
-                title="পাখি ও মানুষ",
-                author="সেলিনা হোসেন",
-                isbn="9789848000003",
-                cover_img="book3.png",
-                description="পাখি আর মানুষের সম্পর্ক নিয়ে সাহিত্য।",
-                category="সাহিত্য",
-                donor_id=3
-            ),
-            Book(
-                title="চাঁদের আলো",
-                author="আনিসুজ্জামান",
-                isbn="9789848000004",
-                cover_img="book4.png",
-                description="রোমান্টিক ও রহস্যময় এক উপন্যাস।",
-                category="উপন্যাস",
-                donor_id=3
-            ),
-            Book(
-                title="বাংলার ইতিহাস",
-                author="ইমদাদুল হক মিলন",
-                isbn="9789848000005",
-                cover_img="book5.png",
-                description="বাংলাদেশের ঐতিহাসিক তথ্যাবলী।",
-                category="ইতিহাস",
-                donor_id=3
-            ),
-            Book(
-                title="কবিতা সংগ্রহ",
-                author="জাহিদা হোসেন",
-                isbn="9789848000006",
-                cover_img="book6.png",
-                description="নান্দনিক কাব্য রচনা।",
-                category="কাব্য",
-                donor_id=7
-            ),
+            Book(title="আজব দুনিয়া", author="মুহম্মদ জাফর ইকবাল", isbn="9789848000001", cover_img="book1.png", description="বিজ্ঞান ও কল্পনার এক অসাধারণ মিশেল।", category="বিজ্ঞান কল্পকাহিনি", donor_id=1),
+            Book(title="হিমু", author="হুমায়ূন আহমেদ", isbn="9789848000002", cover_img="book2.png", description="হিমু চরিত্রের কল্পনাজাত মজার কাহিনী।", category="উপন্যাস", donor_id=3),
+            Book(title="পাখি ও মানুষ", author="সেলিনা হোসেন", isbn="9789848000003", cover_img="book3.png", description="পাখি আর মানুষের সম্পর্ক নিয়ে সাহিত্য।", category="সাহিত্য", donor_id=3),
+            Book(title="চাঁদের আলো", author="আনিসুজ্জামান", isbn="9789848000004", cover_img="book4.png", description="রোমান্টিক ও রহস্যময় এক উপন্যাস।", category="উপন্যাস", donor_id=3),
+            Book(title="বাংলার ইতিহাস", author="ইমদাদুল হক মিলন", isbn="9789848000005", cover_img="book5.png", description="বাংলাদেশের ঐতিহাসিক তথ্যাবলী।", category="ইতিহাস", donor_id=3),
+            Book(title="কবিতা সংগ্রহ", author="জাহিদা হোসেন", isbn="9789848000006", cover_img="book6.png", description="নান্দনিক কাব্য রচনা।", category="কাব্য", donor_id=7),
         ]
         
         for book in sample_books:
@@ -160,61 +81,93 @@ def populate_sample_data():
         
         # Create sample book copies
         sample_copies = [
-            # Book 1 (ID 1): 2 available, 1 borrowed
             BookCopy(book_id=1, status=BookStatus.AVAILABLE),
             BookCopy(book_id=1, status=BookStatus.AVAILABLE),
             BookCopy(book_id=1, status=BookStatus.BORROWED, current_holder_id=3),
-            
-            # Book 2 (ID 2): 1 available, 1 borrowed, 1 lost
             BookCopy(book_id=2, status=BookStatus.AVAILABLE),
             BookCopy(book_id=2, status=BookStatus.BORROWED, current_holder_id=4),
             BookCopy(book_id=2, status=BookStatus.LOST),
-            
-            # Book 3 (ID 3): 1 available
             BookCopy(book_id=3, status=BookStatus.AVAILABLE),
-            
-            # Book 4 (ID 4): 2 available
             BookCopy(book_id=4, status=BookStatus.AVAILABLE),
             BookCopy(book_id=4, status=BookStatus.AVAILABLE),
-            
-            # Book 5 (ID 5): 1 borrowed, 1 available, 1 lost
             BookCopy(book_id=5, status=BookStatus.BORROWED, current_holder_id=5),
             BookCopy(book_id=5, status=BookStatus.AVAILABLE),
             BookCopy(book_id=5, status=BookStatus.LOST),
-            
-            # Book 6 (ID 6): 1 available
-            BookCopy(book_id=6, status=BookStatus.AVAILABLE)
+            BookCopy(book_id=6, status=BookStatus.AVAILABLE),
         ]
         
         for copy in sample_copies:
             session.add(copy)
         session.commit()
         
-        print("✅ Sample data populated successfully!")
+        logger.info("✅ Sample data populated successfully!")
 
-# Initialize database and populate sample data (only if tables are empty)
+# Initialize database and populate sample data (only if enabled in settings)
 def initialize_database():
     create_tables()
-    # Check if data already exists
-    with Session(engine) as session:
-        existing_roles = session.exec(select(Role)).first()
-        if not existing_roles:
-            populate_sample_data()
-        else:
-            print("✅ Database already contains data. Skipping sample data population.")
+    # Only seed demo data if enabled in settings
+    if settings.SEED_DEMO_DATA:
+        with Session(engine) as session:
+            existing_roles = session.exec(select(Role)).first()
+            if not existing_roles:
+                populate_sample_data()
+            else:
+                logger.info("✅ Database already contains data. Skipping sample data population.")
 
 initialize_database()
 
 # ===== FASTAPI APP =====
 
-app = FastAPI(title="Library API")
+app = FastAPI(
+    title="BoiAdda Library API",
+    description="A modern library management system",
+    version="1.0.0",
+    debug=settings.DEBUG
+)
+
+# Logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    logger.info(f"{request.method} {request.url.path} - {response.status_code} - {process_time:.4f}s")
+    return response
+
+# Global exception handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"}
+    )
+
+# CORS middleware with environment-based origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
 )
+
+# Health check endpoints
+@app.get("/healthz", tags=["health"])
+def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "timestamp": datetime.utcnow()}
+
+@app.get("/readyz", tags=["health"])
+def readiness_check(db: Session = Depends(get_db)):
+    """Readiness check endpoint"""
+    try:
+        # Test database connection
+        db.exec(select(Role)).first()
+        return {"status": "ready", "timestamp": datetime.utcnow()}
+    except Exception as e:
+        logger.error(f"Readiness check failed: {e}")
+        raise HTTPException(status_code=503, detail="Service not ready")
 
 # ===== RESPONSE MODELS =====
 
@@ -250,6 +203,160 @@ class UserInfo(BaseModel):
 
 class ReturnBookInput(BaseModel):
     book_copy_id: int  # New field to specify which copy to return
+
+# ===== AUTHENTICATION MODELS =====
+
+class UserRegistration(BaseModel):
+    name: str
+    email: str
+    phone: str
+    password: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserInfo
+    expires_in: int
+
+class AuthUser(BaseModel):
+    id: int
+    name: str
+    email: str
+    phone: Optional[str] = None
+    role_name: str
+    created_at: datetime
+
+# ===== AUTHENTICATION ROUTES =====
+
+@app.post("/auth/register", response_model=AuthResponse, tags=["auth"])
+def register_user(user_data: UserRegistration, db: Session = Depends(get_db)):
+    """Register a new user"""
+    # Check if email already exists
+    existing_user = db.exec(select(User).where(User.email == user_data.email)).first()
+    if existing_user:
+        raise HTTPException(400, detail="Email already registered")
+
+    # Check if phone already exists
+    if user_data.phone:
+        existing_phone = db.exec(select(User).where(User.phone == user_data.phone)).first()
+        if existing_phone:
+            raise HTTPException(400, detail="Phone number already registered")
+
+    # Get the USER role
+    user_role = db.exec(select(Role).where(Role.id == 3)).first()  # Regular user role
+    if not user_role:
+        raise HTTPException(500, detail="User role not found")
+
+    # Create new user with hashed password
+    new_user = User(
+        name=user_data.name,
+        email=user_data.email,
+        phone=user_data.phone,
+        password=get_password_hash(user_data.password),
+        role_id=user_role.id
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    # Create access token
+    access_token = create_access_token(
+        data={"sub": str(new_user.id), "email": new_user.email, "role": user_role.role_name.value}
+    )
+
+    # Get role for response
+    role = db.get(Role, new_user.role_id)
+    user_info = UserInfo(
+        id=new_user.id,
+        name=new_user.name,
+        email=new_user.email,
+        phone=new_user.phone,
+        role_name=role.role_name.value
+    )
+
+    return AuthResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=user_info,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+
+@app.post("/auth/login", response_model=AuthResponse, tags=["auth"])
+def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
+    """Login user with email and password"""
+    # Find user by email
+    user_with_role = db.exec(
+        select(User, Role).join(Role, User.role_id == Role.id).where(User.email == login_data.email)
+    ).first()
+    
+    if not user_with_role:
+        raise HTTPException(401, detail="Invalid email or password")
+    
+    user_obj, role_obj = user_with_role
+    
+    # Verify password
+    if not verify_password(login_data.password, user_obj.password):
+        raise HTTPException(401, detail="Invalid email or password")
+    
+    # Create access token
+    access_token = create_access_token(
+        data={"sub": str(user_obj.id), "email": user_obj.email, "role": role_obj.role_name.value}
+    )
+    
+    user_info = UserInfo(
+        id=user_obj.id,
+        name=user_obj.name,
+        email=user_obj.email,
+        phone=user_obj.phone,
+        role_name=role_obj.role_name.value
+    )
+    
+    return AuthResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=user_info,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+
+@app.post("/auth/logout", tags=["auth"])
+def logout_user():
+    """Logout user (client-side token removal)"""
+    return {"message": "Logged out successfully"}
+
+@app.get("/auth/me", response_model=AuthUser, tags=["auth"])
+def get_current_user(
+    user_id: Optional[int] = Query(None),
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Get current user information"""
+    # Use the authenticated user's ID or the provided user_id for backwards compatibility
+    target_user_id = current_user_id if current_user_id else user_id
+    
+    if not target_user_id:
+        raise HTTPException(400, detail="User ID required")
+    
+    user_with_role = db.exec(
+        select(User, Role).join(Role, User.role_id == Role.id).where(User.id == target_user_id)
+    ).first()
+    
+    if not user_with_role:
+        raise HTTPException(404, detail="User not found")
+    
+    user_obj, role_obj = user_with_role
+    
+    return AuthUser(
+        id=user_obj.id,
+        name=user_obj.name,
+        email=user_obj.email,
+        phone=user_obj.phone,
+        role_name=role_obj.role_name.value,
+        created_at=user_obj.created_at
+    )
 
 # ===== ROUTES =====
 
@@ -736,9 +843,33 @@ def get_user_statistics(user_id: int, db: Session = Depends(get_db)):
 
 @app.get("/reset-db/", tags=["utility"])
 def reset_database():
-    """Reset and repopulate the database with sample data"""
-    create_tables()
+    """Reset and repopulate the database with sample data (DEV ONLY)"""
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(403, detail="Not allowed in production")
+    
+    SQLModel.metadata.drop_all(engine)
+    SQLModel.metadata.create_all(engine)
     populate_sample_data()
     return {"message": "Database reset and populated with sample data"}
 
-# ===== End of file =====
+# ===== APPLICATION INFO =====
+
+@app.get("/info", tags=["info"])
+def app_info():
+    """Get application information"""
+    return {
+        "name": "BoiAdda Library API",
+        "version": "1.0.0",
+        "environment": settings.ENVIRONMENT,
+        "debug": settings.DEBUG
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=settings.DEBUG,
+        log_level="debug" if settings.DEBUG else "info"
+    )

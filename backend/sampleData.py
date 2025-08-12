@@ -1,4 +1,4 @@
-from models import User, Book, BookCopy, BookStatus
+from models import *
 
 # ---- USERS ----
 
@@ -143,4 +143,11 @@ sample_copies = [
 
     # Book 6 (ID 6): 1 available
     BookCopy(book_id=6, status=BookStatus.AVAILABLE)
+]
+
+# Create roles first
+roles = [
+    Role(id=1, role_name=RoleType.ADMIN, description="Administrator"),
+    Role(id=2, role_name=RoleType.USER, description="Moderator"),  # You might want to add MODERATOR to enum
+    Role(id=3, role_name=RoleType.USER, description="Regular User"),
 ]
