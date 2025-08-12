@@ -1,4 +1,5 @@
 import { forwardRef } from 'react';
+import { colorClasses } from '../../styles/colors.js';
 
 const Input = forwardRef(({ 
     label, 
@@ -10,10 +11,10 @@ const Input = forwardRef(({
 }, ref) => {
     const inputClasses = `
         w-full px-3 py-2 border rounded-lg transition-colors
-        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+        focus:outline-none focus:ring-2 ${colorClasses.ring.accent} focus:border-transparent
         ${error 
-            ? 'border-red-300 focus:ring-red-500' 
-            : 'border-gray-300 hover:border-gray-400'
+            ? `${colorClasses.border.error} focus:ring-red-500` 
+            : `${colorClasses.border.primary} hover:border-gray-400`
         }
         ${className}
     `;
@@ -21,7 +22,7 @@ const Input = forwardRef(({
     return (
         <div className="space-y-2">
             {label && (
-                <label className="block text-sm font-medium text-gray-700">
+                <label className={`block text-sm font-medium ${colorClasses.text.secondary}`}>
                     {label}
                     {required && <span className="text-red-500 ml-1">*</span>}
                 </label>
@@ -33,7 +34,7 @@ const Input = forwardRef(({
                 {...props}
             />
             {error && (
-                <p className="text-sm text-red-600">{error}</p>
+                <p className={`text-sm ${colorClasses.text.error}`}>{error}</p>
             )}
         </div>
     );

@@ -1,33 +1,47 @@
-import { Menu, File, BookOpen, BookCopy } from "lucide-react";
+import { 
+  Menu, 
+  Home, 
+  BookOpen, 
+  Gift, 
+  Search,
+  User,
+  Book,
+  Settings 
+} from "lucide-react";
 import { NavLink } from 'react-router-dom';
 import { useSidebar } from '../../hooks/useSidebar.js';
+import { colorClasses } from '../../styles/colors.js';
 
 const Sidebar = () => {
     const { isOpen, toggle } = useSidebar();
 
     const navItems = [
-        { label: "Dashboard", path: "/", icon: File },
-        { label: "Books", path: "/books", icon: BookOpen },
-        { label: "Donate", path: "/donate", icon: BookCopy },
+        { label: "ড্যাশবোর্ড", path: "/", icon: Home },
+        { label: "বই সংগ্রহ", path: "/books", icon: BookOpen },
+        { label: "খুঁজুন", path: "/search", icon: Search },
+        { label: "বই দান", path: "/donate", icon: Gift },
+        { label: "আমার বই", path: "/my-books", icon: Book },
+        { label: "প্রোফাইল", path: "/profile", icon: User },
+        { label: "সেটিংস", path: "/settings", icon: Settings },
     ];
 
     return (
         <>
             <button 
                 onClick={toggle}
-                className="fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
+                className={`fixed top-4 left-4 z-50 p-2 ${colorClasses.bg.primary} rounded-lg shadow-md hover:shadow-lg transition-shadow`}
             >
-                <Menu className="w-6 h-6 text-gray-700" />
+                <Menu className={`w-6 h-6 ${colorClasses.text.secondary}`} />
             </button>
 
-            <aside className={`fixed top-0 left-0 h-full w-64 bg-white/95 backdrop-blur-sm border-r shadow-lg transform transition-transform duration-300 ease-in-out z-40 ${
+            <aside className={`fixed top-0 left-0 h-full w-64 ${colorClasses.bg.primary}/95 backdrop-blur-sm border-r ${colorClasses.border.primary} shadow-lg transform transition-transform duration-300 ease-in-out z-40 ${
                 isOpen ? 'translate-x-0' : '-translate-x-full'
             }`}>
                 <div className="p-6">
-                    <h1 className="text-2xl font-bold text-center text-gray-800 mb-6">
+                    <h1 className={`text-2xl font-bold text-center ${colorClasses.text.accent} mb-6`}>
                         বই আড্ডা
                     </h1>
-                    <div className="border-b border-gray-200 mb-6"></div>
+                    <div className={`border-b ${colorClasses.border.primary} mb-6`}></div>
 
                     <nav className="space-y-2">
                         {navItems.map((nav) => {
@@ -40,8 +54,8 @@ const Sidebar = () => {
                                     className={({ isActive }) => `
                                         flex items-center gap-3 p-3 rounded-lg transition-colors
                                         ${isActive 
-                                            ? 'bg-blue-100 text-blue-700 border-l-4 border-blue-700' 
-                                            : 'text-gray-700 hover:bg-gray-100'
+                                            ? `${colorClasses.bg.success} ${colorClasses.text.success} border-l-4 border-green-600` 
+                                            : `${colorClasses.text.secondary} hover:bg-gray-100`
                                         }
                                     `}
                                 >

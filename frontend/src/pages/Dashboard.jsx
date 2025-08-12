@@ -1,89 +1,173 @@
 import { Link } from 'react-router-dom';
+import { 
+  BookOpen, 
+  Heart, 
+  Users, 
+  TrendingUp,
+  Book,
+  Gift,
+  User
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
+import { PageHeader, Card, StatsCard } from '../components/ui/ThemeComponents.jsx';
+import { colorClasses } from '../styles/colors.js';
 
 const Dashboard = () => {
     const { user } = useAuth();
 
     return (
-        <div className="max-w-6xl mx-auto">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                    Welcome back, {user?.name}!
-                </h1>
-                <p className="text-gray-600">
-                    Discover, borrow, and share books with our community
-                </p>
-            </div>
+        <div className="space-y-6">
+            {/* Header */}
+            <PageHeader
+                title={`স্বাগতম, ${user?.name || 'ব্যবহারকারী'}!`}
+                subtitle="আমাদের কমিউনিটির সাথে বই আবিষ্কার, ধার এবং ভাগাভাগি করুন"
+            />
 
+            {/* Quick Actions */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                        Available Books
-                    </h3>
-                    <p className="text-gray-600 mb-4">
-                        Browse through our collection of books
-                    </p>
+                <Card>
+                    <div className="flex items-center mb-4">
+                        <div className={`p-3 rounded-lg ${colorClasses.bg.success} mr-4`}>
+                            <BookOpen className={`h-6 w-6 ${colorClasses.text.success}`} />
+                        </div>
+                        <div>
+                            <h3 className={`text-lg font-semibold ${colorClasses.text.primary} mb-1`}>
+                                উপলব্ধ বই
+                            </h3>
+                            <p className={`${colorClasses.text.secondary} text-sm`}>
+                                আমাদের বইয়ের সংগ্রহ ব্রাউজ করুন
+                            </p>
+                        </div>
+                    </div>
                     <Link 
                         to="/books" 
-                        className="text-blue-600 hover:text-blue-800 font-medium inline-flex items-center"
+                        className={`${colorClasses.text.accent} ${colorClasses.text.accentHover} font-medium inline-flex items-center text-sm transition-colors`}
                     >
-                        View Books →
+                        বই দেখুন →
                     </Link>
-                </div>
+                </Card>
 
-                <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                        Donate a Book
-                    </h3>
-                    <p className="text-gray-600 mb-4">
-                        Share your books with the community
-                    </p>
+                <Card>
+                    <div className="flex items-center mb-4">
+                        <div className={`p-3 rounded-lg ${colorClasses.bg.info} mr-4`}>
+                            <Gift className={`h-6 w-6 ${colorClasses.text.info}`} />
+                        </div>
+                        <div>
+                            <h3 className={`text-lg font-semibold ${colorClasses.text.primary} mb-1`}>
+                                বই দান করুন
+                            </h3>
+                            <p className={`${colorClasses.text.secondary} text-sm`}>
+                                কমিউনিটির সাথে আপনার বই শেয়ার করুন
+                            </p>
+                        </div>
+                    </div>
                     <Link 
                         to="/donate" 
-                        className="text-blue-600 hover:text-blue-800 font-medium inline-flex items-center"
+                        className={`${colorClasses.text.accent} ${colorClasses.text.accentHover} font-medium inline-flex items-center text-sm transition-colors`}
                     >
-                        Donate Now →
+                        এখনই দান করুন →
                     </Link>
-                </div>
+                </Card>
 
-                <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                        Your Library
-                    </h3>
-                    <p className="text-gray-600 mb-4">
-                        Manage your borrowed books
-                    </p>
+                <Card>
+                    <div className="flex items-center mb-4">
+                        <div className={`p-3 rounded-lg bg-purple-100 mr-4`}>
+                            <User className="h-6 w-6 text-purple-600" />
+                        </div>
+                        <div>
+                            <h3 className={`text-lg font-semibold ${colorClasses.text.primary} mb-1`}>
+                                আপনার লাইব্রেরি
+                            </h3>
+                            <p className={`${colorClasses.text.secondary} text-sm`}>
+                                আপনার ধার নেওয়া বই পরিচালনা করুন
+                            </p>
+                        </div>
+                    </div>
                     <Link 
                         to="/my-books" 
-                        className="text-blue-600 hover:text-blue-800 font-medium inline-flex items-center"
+                        className={`${colorClasses.text.accent} ${colorClasses.text.accentHover} font-medium inline-flex items-center text-sm transition-colors`}
                     >
-                        View My Books →
+                        আমার বই দেখুন →
                     </Link>
-                </div>
+                </Card>
             </div>
 
             {/* Quick Stats */}
-            <div className="mt-12">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">Quick Stats</h2>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                        <div className="text-2xl font-bold text-blue-600">150+</div>
-                        <div className="text-sm text-blue-800">Available Books</div>
-                    </div>
-                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                        <div className="text-2xl font-bold text-green-600">25</div>
-                        <div className="text-sm text-green-800">Books Borrowed</div>
-                    </div>
-                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                        <div className="text-2xl font-bold text-purple-600">12</div>
-                        <div className="text-sm text-purple-800">Books Donated</div>
-                    </div>
-                    <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-                        <div className="text-2xl font-bold text-orange-600">500+</div>
-                        <div className="text-sm text-orange-800">Community Members</div>
-                    </div>
+            <div>
+                <h2 className={`text-xl font-semibold ${colorClasses.text.primary} mb-6`}>দ্রুত পরিসংখ্যান</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <StatsCard
+                        value="১৫০+"
+                        label="উপলব্ধ বই"
+                        icon={BookOpen}
+                        color="green"
+                    />
+                    <StatsCard
+                        value="২৫"
+                        label="ধার নেওয়া বই"
+                        icon={Book}
+                        color="blue"
+                    />
+                    <StatsCard
+                        value="১২"
+                        label="দান করা বই"
+                        icon={Heart}
+                        color="purple"
+                    />
+                    <StatsCard
+                        value="৫০০+"
+                        label="কমিউনিটি সদস্য"
+                        icon={Users}
+                        color="orange"
+                    />
                 </div>
             </div>
+
+            {/* Recent Activity */}
+            <Card>
+                <h3 className={`text-lg font-semibold ${colorClasses.text.primary} mb-4`}>সাম্প্রতিক কার্যকলাপ</h3>
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                        <div className="flex items-center">
+                            <div className={`p-2 rounded-full ${colorClasses.bg.success} mr-3`}>
+                                <BookOpen className={`h-4 w-4 ${colorClasses.text.success}`} />
+                            </div>
+                            <div>
+                                <p className={`text-sm font-medium ${colorClasses.text.primary}`}>
+                                    "বাংলা সাহিত্যের ইতিহাস" বই ধার নেওয়া হয়েছে
+                                </p>
+                                <p className={`text-xs ${colorClasses.text.tertiary}`}>২ ঘন্টা আগে</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                        <div className="flex items-center">
+                            <div className={`p-2 rounded-full ${colorClasses.bg.info} mr-3`}>
+                                <Gift className={`h-4 w-4 ${colorClasses.text.info}`} />
+                            </div>
+                            <div>
+                                <p className={`text-sm font-medium ${colorClasses.text.primary}`}>
+                                    নতুন বই দান করা হয়েছে
+                                </p>
+                                <p className={`text-xs ${colorClasses.text.tertiary}`}>১ দিন আগে</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                        <div className="flex items-center">
+                            <div className="p-2 rounded-full bg-purple-100 mr-3">
+                                <Users className="h-4 w-4 text-purple-600" />
+                            </div>
+                            <div>
+                                <p className={`text-sm font-medium ${colorClasses.text.primary}`}>
+                                    নতুন সদস্য যোগ দিয়েছেন
+                                </p>
+                                <p className={`text-xs ${colorClasses.text.tertiary}`}>৩ দিন আগে</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Card>
         </div>
     );
 };

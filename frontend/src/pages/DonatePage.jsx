@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { Book, User, FileText, Image, Heart, Gift } from 'lucide-react';
 import { useDonateBook } from '../hooks/useBooks.js';
-import Button from '../components/ui/Button.jsx';
+import { PageHeader, Card, Button, Input } from '../components/ui/ThemeComponents.jsx';
+import { colorClasses } from '../styles/colors.js';
 
 const DonatePage = () => {
     const [formData, setFormData] = useState({
@@ -24,7 +26,7 @@ const DonatePage = () => {
         e.preventDefault();
         
         if (!formData.title.trim() || !formData.author.trim()) {
-            alert('Please fill in the required fields (Title and Author)');
+            alert('অনুগ্রহ করে প্রয়োজনীয় ক্ষেত্রগুলি পূরণ করুন (শিরোনাম এবং লেখক)');
             return;
         }
 
@@ -40,104 +42,203 @@ const DonatePage = () => {
         });
     };
 
+    const handleClearForm = () => {
+        setFormData({
+            title: '',
+            author: '',
+            description: '',
+            cover_img: ''
+        });
+    };
+
     return (
-        <div className="max-w-2xl mx-auto">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                    Donate a Book
-                </h1>
-                <p className="text-gray-600">
-                    Share your books with the community and help others discover new stories
-                </p>
+        <div className="space-y-6">
+            {/* Header */}
+            <PageHeader
+                title="বই দান করুন"
+                subtitle="কমিউনিটির সাথে আপনার বই ভাগাভাগি করুন এবং অন্যদের নতুন গল্প আবিষ্কার করতে সাহায্য করুন"
+            />
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Form */}
+                <div className="lg:col-span-2">
+                    <Card>
+                        <h3 className={`text-lg font-semibold ${colorClasses.text.primary} mb-6`}>
+                            বইয়ের তথ্য
+                        </h3>
+                        
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <Input
+                                label="বইয়ের শিরোনাম *"
+                                name="title"
+                                value={formData.title}
+                                onChange={handleInputChange}
+                                icon={Book}
+                                placeholder="বইয়ের শিরোনাম লিখুন"
+                                required
+                            />
+
+                            <Input
+                                label="লেখকের নাম *"
+                                name="author"
+                                value={formData.author}
+                                onChange={handleInputChange}
+                                icon={User}
+                                placeholder="লেখকের নাম লিখুন"
+                                required
+                            />
+
+                            <div>
+                                <label className={`block text-sm font-medium ${colorClasses.text.secondary} mb-2`}>
+                                    <FileText className="inline h-4 w-4 mr-1" />
+                                    বইয়ের বিবরণ
+                                </label>
+                                <textarea
+                                    name="description"
+                                    value={formData.description}
+                                    onChange={handleInputChange}
+                                    rows={4}
+                                    className={`w-full px-3 py-2 border ${colorClasses.border.primary} rounded-md focus:outline-none focus:ring-2 ${colorClasses.ring.accent} focus:border-transparent`}
+                                    placeholder="বইটি সম্পর্কে সংক্ষিপ্ত বিবরণ লিখুন"
+                                />
+                            </div>
+
+                            <Input
+                                label="কভার ইমেজ URL"
+                                name="cover_img"
+                                type="url"
+                                value={formData.cover_img}
+                                onChange={handleInputChange}
+                                icon={Image}
+                                placeholder="https://example.com/book-cover.jpg"
+                            />
+
+                            <div className="flex gap-4 pt-4">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={handleClearForm}
+                                    className="flex-1"
+                                >
+                                    ফর্ম পরিষ্কার করুন
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    variant="primary"
+                                    disabled={donateMutation.isPending}
+                                    loading={donateMutation.isPending}
+                                    className="flex-1"
+                                    icon={Gift}
+                                >
+                                    {donateMutation.isPending ? 'দান করা হচ্ছে...' : 'বই দান করুন'}
+                                </Button>
+                            </div>
+                        </form>
+                    </Card>
+                </div>
+
+                {/* Sidebar */}
+                <div className="space-y-6">
+                    {/* Donation Impact */}
+                    <Card>
+                        <h3 className={`text-lg font-semibold ${colorClasses.text.primary} mb-4`}>
+                            দানের প্রভাব
+                        </h3>
+                        <div className="space-y-4">
+                            <div className="flex items-center">
+                                <div className={`p-2 rounded-full ${colorClasses.bg.success} mr-3`}>
+                                    <Heart className={`h-4 w-4 ${colorClasses.text.success}`} />
+                                </div>
+                                <div>
+                                    <p className={`text-sm font-medium ${colorClasses.text.primary}`}>
+                                        কমিউনিটিকে সাহায্য করুন
+                                    </p>
+                                    <p className={`text-xs ${colorClasses.text.tertiary}`}>
+                                        অন্যদের পড়ার সুযোগ দিন
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center">
+                                <div className={`p-2 rounded-full ${colorClasses.bg.info} mr-3`}>
+                                    <Book className={`h-4 w-4 ${colorClasses.text.info}`} />
+                                </div>
+                                <div>
+                                    <p className={`text-sm font-medium ${colorClasses.text.primary}`}>
+                                        সংগ্রহ বৃদ্ধি করুন
+                                    </p>
+                                    <p className={`text-xs ${colorClasses.text.tertiary}`}>
+                                        লাইব্রেরি সমৃদ্ধ করুন
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Guidelines */}
+                    <Card>
+                        <h3 className={`text-lg font-semibold ${colorClasses.text.primary} mb-4`}>
+                            দানের নির্দেশনা
+                        </h3>
+                        <div className="space-y-3 text-sm">
+                            <div className={`p-3 rounded-md ${colorClasses.bg.success}`}>
+                                <p className={`${colorClasses.text.success} font-medium mb-1`}>
+                                    ✓ করবেন
+                                </p>
+                                <ul className={`${colorClasses.text.success} space-y-1 text-xs`}>
+                                    <li>• সঠিক তথ্য প্রদান করুন</li>
+                                    <li>• বইয়ের অবস্থা ভালো রাখুন</li>
+                                    <li>• স্পষ্ট ছবি ব্যবহার করুন</li>
+                                </ul>
+                            </div>
+                            
+                            <div className={`p-3 rounded-md ${colorClasses.bg.warning}`}>
+                                <p className={`${colorClasses.text.warning} font-medium mb-1`}>
+                                    ⚠ এড়িয়ে চলুন
+                                </p>
+                                <ul className={`${colorClasses.text.warning} space-y-1 text-xs`}>
+                                    <li>• ভুল তথ্য দেওয়া</li>
+                                    <li>• ক্ষতিগ্রস্ত বই দান</li>
+                                    <li>• অস্পষ্ট বিবরণ</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Stats */}
+                    <Card>
+                        <h3 className={`text-lg font-semibold ${colorClasses.text.primary} mb-4`}>
+                            আপনার অবদান
+                        </h3>
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <span className={`text-sm ${colorClasses.text.secondary}`}>
+                                    মোট দান
+                                </span>
+                                <span className={`font-semibold ${colorClasses.text.accent}`}>
+                                    ৮ টি বই
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className={`text-sm ${colorClasses.text.secondary}`}>
+                                    এই মাসে
+                                </span>
+                                <span className={`font-semibold ${colorClasses.text.accent}`}>
+                                    ২ টি বই
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className={`text-sm ${colorClasses.text.secondary}`}>
+                                    ধার নেওয়া হয়েছে
+                                </span>
+                                <span className={`font-semibold ${colorClasses.text.accent}`}>
+                                    ১৫ বার
+                                </span>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
             </div>
-
-            <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-6 space-y-6">
-                <div>
-                    <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-                        Book Title *
-                    </label>
-                    <input
-                        type="text"
-                        id="title"
-                        name="title"
-                        value={formData.title}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Enter book title"
-                        required
-                    />
-                </div>
-
-                <div>
-                    <label htmlFor="author" className="block text-sm font-medium text-gray-700 mb-2">
-                        Author *
-                    </label>
-                    <input
-                        type="text"
-                        id="author"
-                        name="author"
-                        value={formData.author}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Enter author name"
-                        required
-                    />
-                </div>
-
-                <div>
-                    <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                        Description
-                    </label>
-                    <textarea
-                        id="description"
-                        name="description"
-                        value={formData.description}
-                        onChange={handleInputChange}
-                        rows={4}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Brief description of the book"
-                    />
-                </div>
-
-                <div>
-                    <label htmlFor="cover_img" className="block text-sm font-medium text-gray-700 mb-2">
-                        Cover Image URL
-                    </label>
-                    <input
-                        type="url"
-                        id="cover_img"
-                        name="cover_img"
-                        value={formData.cover_img}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="https://example.com/book-cover.jpg"
-                    />
-                </div>
-
-                <div className="flex gap-4 pt-4">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setFormData({
-                            title: '',
-                            author: '',
-                            description: '',
-                            cover_img: ''
-                        })}
-                        className="flex-1"
-                    >
-                        Clear Form
-                    </Button>
-                    <Button
-                        type="submit"
-                        variant="primary"
-                        disabled={donateMutation.isPending}
-                        className="flex-1"
-                    >
-                        {donateMutation.isPending ? 'Donating...' : 'Donate Book'}
-                    </Button>
-                </div>
-            </form>
         </div>
     );
 };

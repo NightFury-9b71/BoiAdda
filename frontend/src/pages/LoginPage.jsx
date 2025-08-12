@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
-import Button from '../components/ui/Button.jsx';
-import Input from '../components/ui/Input.jsx';
-import Card from '../components/ui/Card.jsx';
-import LoadingSpinner from '../components/ui/LoadingSpinner.jsx';
-import { Eye, EyeOff } from 'lucide-react';
+import { Button, Input, Card, LoadingSpinner } from '../components/ui/ThemeComponents.jsx';
+import { colorClasses } from '../styles/colors.js';
 import DemoHelper from '../components/DemoHelper.jsx';
 
 const LoginPage = () => {
@@ -44,15 +42,15 @@ const LoginPage = () => {
         const newErrors = {};
 
         if (!formData.email.trim()) {
-            newErrors.email = 'Email is required';
+            newErrors.email = 'ইমেইল প্রয়োজন';
         } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-            newErrors.email = 'Please enter a valid email address';
+            newErrors.email = 'সঠিক ইমেইল ঠিকানা দিন';
         }
 
         if (!formData.password) {
-            newErrors.password = 'Password is required';
+            newErrors.password = 'পাসওয়ার্ড প্রয়োজন';
         } else if (formData.password.length < 6) {
-            newErrors.password = 'Password must be at least 6 characters';
+            newErrors.password = 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে';
         }
 
         setErrors(newErrors);
@@ -68,7 +66,7 @@ const LoginPage = () => {
             if (u.role_name === "admin") navigate("/admin");
             else navigate("/books");
         } catch (err) {
-            setErrors({ form: err?.response?.data?.detail || "Login failed" });
+            setErrors({ form: err?.response?.data?.detail || "লগইন ব্যর্থ" });
         } finally {
             setIsSubmitting(false);
         }
@@ -82,123 +80,126 @@ const LoginPage = () => {
     if (isLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
-                <LoadingSpinner size="lg" />
+                <div className="text-center">
+                    <LoadingSpinner size="lg" className="mx-auto mb-4" />
+                    <p className={colorClasses.text.secondary}>লোড হচ্ছে...</p>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className={`min-h-screen flex items-center justify-center ${colorClasses.bg.secondary} py-12 px-4 sm:px-6 lg:px-8`}>
             <div className="max-w-md w-full">
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                    <h1 className={`text-3xl font-bold ${colorClasses.text.accent} mb-2`}>
                         বই আড্ডা
                     </h1>
-                    <p className="text-gray-600">
-                        Sign in to your account
+                    <p className={colorClasses.text.secondary}>
+                        আপনার অ্যাকাউন্টে সাইন ইন করুন
                     </p>
                 </div>
 
                 <Card>
-                    <Card.Content className="p-6">
-                        <form onSubmit={handleSubmit} className="space-y-6">
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <Input
+                            label="ইমেইল ঠিকানা"
+                            type="email"
+                            name="email"
+                            value={formData.email}
+                            onChange={handleInputChange}
+                            error={errors.email}
+                            icon={Mail}
+                            required
+                            autoComplete="email"
+                            placeholder="আপনার ইমেইল দিন"
+                        />
+
+                        <div className="relative">
                             <Input
-                                label="Email Address"
-                                type="email"
-                                name="email"
-                                value={formData.email}
+                                label="পাসওয়ার্ড"
+                                type={showPassword ? "text" : "password"}
+                                name="password"
+                                value={formData.password}
                                 onChange={handleInputChange}
-                                error={errors.email}
+                                error={errors.password}
+                                icon={Lock}
                                 required
-                                autoComplete="email"
-                                placeholder="Enter your email"
+                                autoComplete="current-password"
+                                placeholder="আপনার পাসওয়ার্ড দিন"
                             />
-
-                            <div className="relative">
-                                <Input
-                                    label="Password"
-                                    type={showPassword ? "text" : "password"}
-                                    name="password"
-                                    value={formData.password}
-                                    onChange={handleInputChange}
-                                    error={errors.password}
-                                    required
-                                    autoComplete="current-password"
-                                    placeholder="Enter your password"
-                                />
-                                <button
-                                    type="button"
-                                    className="absolute right-3 top-8 text-gray-400 hover:text-gray-600"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                >
-                                    {showPassword ? (
-                                        <EyeOff className="w-5 h-5" />
-                                    ) : (
-                                        <Eye className="w-5 h-5" />
-                                    )}
-                                </button>
-                            </div>
-
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center">
-                                    <input
-                                        id="remember-me"
-                                        name="remember-me"
-                                        type="checkbox"
-                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                    />
-                                    <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
-                                        Remember me
-                                    </label>
-                                </div>
-
-                                <Link
-                                    to="/forgot-password"
-                                    className="text-sm text-blue-600 hover:text-blue-800"
-                                >
-                                    Forgot password?
-                                </Link>
-                            </div>
-
-                            <Button
-                                type="submit"
-                                variant="primary"
-                                className="w-full"
-                                disabled={isSubmitting}
+                            <button
+                                type="button"
+                                className={`absolute right-3 top-8 ${colorClasses.text.tertiary} hover:text-gray-600`}
+                                onClick={() => setShowPassword(!showPassword)}
                             >
-                                {isSubmitting ? (
-                                    <div className="flex items-center justify-center">
-                                        <LoadingSpinner size="sm" className="mr-2" />
-                                        Signing in...
-                                    </div>
+                                {showPassword ? (
+                                    <EyeOff className="w-5 h-5" />
                                 ) : (
-                                    'Sign In'
+                                    <Eye className="w-5 h-5" />
                                 )}
-                            </Button>
-                        </form>
+                            </button>
+                        </div>
 
-                        <div className="mt-6">
-                            <div className="relative">
-                                <div className="absolute inset-0 flex items-center">
-                                    <div className="w-full border-t border-gray-300" />
-                                </div>
-                                <div className="relative flex justify-center text-sm">
-                                    <span className="px-2 bg-white text-gray-500">
-                                        Don't have an account?
-                                    </span>
-                                </div>
+                        {errors.form && (
+                            <div className={`p-3 rounded-md ${colorClasses.bg.error}`}>
+                                <p className={`text-sm ${colorClasses.text.error}`}>{errors.form}</p>
+                            </div>
+                        )}
+
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                                <input
+                                    id="remember-me"
+                                    name="remember-me"
+                                    type="checkbox"
+                                    className={`h-4 w-4 ${colorClasses.text.accent} ${colorClasses.ring.accent} ${colorClasses.border.primary} rounded`}
+                                />
+                                <label htmlFor="remember-me" className={`ml-2 block text-sm ${colorClasses.text.secondary}`}>
+                                    আমাকে মনে রাখুন
+                                </label>
                             </div>
 
-                            <div className="mt-6">
-                                <Link
-                                    to="/register"
-                                    className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                                >
-                                    Create new account
-                                </Link>
+                            <Link
+                                to="/forgot-password"
+                                className={`text-sm ${colorClasses.text.accent} ${colorClasses.text.accentHover} transition-colors`}
+                            >
+                                পাসওয়ার্ড ভুলে গেছেন?
+                            </Link>
+                        </div>
+
+                        <Button
+                            type="submit"
+                            variant="primary"
+                            className="w-full"
+                            disabled={isSubmitting}
+                            loading={isSubmitting}
+                        >
+                            {isSubmitting ? 'সাইন ইন হচ্ছে...' : 'সাইন ইন'}
+                        </Button>
+                    </form>
+
+                    <div className="mt-6">
+                        <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className={`w-full border-t ${colorClasses.border.primary}`} />
+                            </div>
+                            <div className="relative flex justify-center text-sm">
+                                <span className={`px-2 ${colorClasses.bg.primary} ${colorClasses.text.tertiary}`}>
+                                    অ্যাকাউন্ট নেই?
+                                </span>
                             </div>
                         </div>
-                    </Card.Content>
+
+                        <div className="mt-6">
+                            <Link
+                                to="/register"
+                                className={`w-full flex justify-center py-2 px-4 border ${colorClasses.border.primary} rounded-lg text-sm font-medium ${colorClasses.text.secondary} ${colorClasses.bg.primary} hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 ${colorClasses.ring.accent} transition-colors`}
+                            >
+                                নতুন অ্যাকাউন্ট তৈরি করুন
+                            </Link>
+                        </div>
+                    </div>
                 </Card>
             </div>
 

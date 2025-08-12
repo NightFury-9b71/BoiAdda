@@ -1,7 +1,9 @@
+import { colorClasses } from '../../styles/colors.js';
+
 const Card = ({ children, className = "", ...props }) => {
     return (
         <div 
-            className={`bg-white rounded-lg shadow-md border border-gray-200 ${className}`}
+            className={`${colorClasses.bg.primary} rounded-lg shadow-md border ${colorClasses.border.primary} ${className}`}
             {...props}
         >
             {children}
@@ -11,7 +13,7 @@ const Card = ({ children, className = "", ...props }) => {
 
 const CardHeader = ({ children, className = "" }) => {
     return (
-        <div className={`px-6 py-4 border-b border-gray-200 ${className}`}>
+        <div className={`px-6 py-4 border-b ${colorClasses.border.primary} ${className}`}>
             {children}
         </div>
     );
@@ -27,7 +29,7 @@ const CardContent = ({ children, className = "" }) => {
 
 const CardTitle = ({ children, className = "" }) => {
     return (
-        <h2 className={`text-xl font-semibold text-gray-900 ${className}`}>
+        <h2 className={`text-xl font-semibold ${colorClasses.text.primary} ${className}`}>
             {children}
         </h2>
     );
@@ -35,7 +37,7 @@ const CardTitle = ({ children, className = "" }) => {
 
 const CardDescription = ({ children, className = "" }) => {
     return (
-        <p className={`text-gray-600 ${className}`}>
+        <p className={`${colorClasses.text.secondary} ${className}`}>
             {children}
         </p>
     );

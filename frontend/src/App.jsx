@@ -8,9 +8,13 @@ import PublicRoute from './components/PublicRoute.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import BooksPage from './pages/BooksPage.jsx';
 import DonatePage from './pages/DonatePage.jsx';
+import ProfilePage from './pages/ProfilePage.jsx';
+import MyBooksPage from './pages/MyBooksPage.jsx';
+import SettingsPage from './pages/SettingsPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx';
+import SearchBooks from './pages/Theme.jsx'; // Import the search books page
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -69,7 +73,11 @@ const App = () => {
                             >
                                 <Route index element={<Dashboard />} />
                                 <Route path="/books" element={<BooksPage />} />
+                                <Route path="/search" element={<SearchBooks />} />
                                 <Route path="/donate" element={<DonatePage />} />
+                                <Route path="/profile" element={<ProfilePage />} />
+                                <Route path="/my-books" element={<MyBooksPage />} />
+                                <Route path="/settings" element={<SettingsPage />} />
                             </Route>
                         </Routes>
                     </div>
