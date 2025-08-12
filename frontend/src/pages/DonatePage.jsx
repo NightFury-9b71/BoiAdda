@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Book, User, FileText, Image, Heart, Gift } from 'lucide-react';
+import { Book, User, FileText, Image, Users, Gift } from 'lucide-react';
 import { useDonateBook } from '../hooks/useBooks.js';
 import { PageHeader, Card, Button, Input } from '../components/ui/ThemeComponents.jsx';
 import { colorClasses } from '../styles/colors.js';
@@ -147,7 +147,7 @@ const DonatePage = () => {
                         <div className="space-y-4">
                             <div className="flex items-center">
                                 <div className={`p-2 rounded-full ${colorClasses.bg.success} mr-3`}>
-                                    <Heart className={`h-4 w-4 ${colorClasses.text.success}`} />
+                                    <Users className={`h-4 w-4 ${colorClasses.text.success}`} />
                                 </div>
                                 <div>
                                     <p className={`text-sm font-medium ${colorClasses.text.primary}`}>

@@ -5,12 +5,14 @@ import { AuthProvider } from './context/AuthContext.jsx';
 import Layout from './components/layout/Layout.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import PublicRoute from './components/PublicRoute.jsx';
+import AdminRoute from './components/AdminRoute.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import BooksPage from './pages/BooksPage.jsx';
 import DonatePage from './pages/DonatePage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import MyBooksPage from './pages/MyBooksPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
+import AdminDashboard from './pages/AdminDashboard.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx';
@@ -77,6 +79,11 @@ const App = () => {
                                 <Route path="/donate" element={<DonatePage />} />
                                 <Route path="/profile" element={<ProfilePage />} />
                                 <Route path="/my-books" element={<MyBooksPage />} />
+                                <Route path="/admin" element={
+                                    <AdminRoute>
+                                        <AdminDashboard />
+                                    </AdminRoute>
+                                } />
                                 <Route path="/settings" element={<SettingsPage />} />
                             </Route>
                         </Routes>

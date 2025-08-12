@@ -6,14 +6,18 @@ import {
   Search,
   User,
   Book,
-  Settings 
+  Settings,
+  Shield,
+  CheckSquare
 } from "lucide-react";
 import { NavLink } from 'react-router-dom';
 import { useSidebar } from '../../hooks/useSidebar.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { colorClasses } from '../../styles/colors.js';
 
 const Sidebar = () => {
     const { isOpen, toggle } = useSidebar();
+    const { user } = useAuth();
 
     const navItems = [
         { label: "ড্যাশবোর্ড", path: "/", icon: Home },
@@ -24,6 +28,13 @@ const Sidebar = () => {
         { label: "প্রোফাইল", path: "/profile", icon: User },
         { label: "সেটিংস", path: "/settings", icon: Settings },
     ];
+
+    const adminNavItems = [
+        { label: "অ্যাডমিন ড্যাশবোর্ড", path: "/admin", icon: Shield },
+    ];
+
+    // Check if user is admin
+    const isAdmin = user?.role_name === 'admin';
 
     return (
         <>
@@ -64,6 +75,37 @@ const Sidebar = () => {
                                 </NavLink>
                             );
                         })}
+
+                        {/* Admin Section */}
+                        {isAdmin && (
+                            <>
+                                <div className={`border-t ${colorClasses.border.primary} my-4 pt-4`}>
+                                    <h3 className={`text-xs font-semibold ${colorClasses.text.tertiary} mb-2 px-3`}>
+                                        অ্যাডমিন প্যানেল
+                                    </h3>
+                                </div>
+                                {adminNavItems.map((nav) => {
+                                    const IconComponent = nav.icon;
+                                    return (
+                                        <NavLink 
+                                            key={nav.label} 
+                                            to={nav.path} 
+                                            onClick={toggle}
+                                            className={({ isActive }) => `
+                                                flex items-center gap-3 p-3 rounded-lg transition-colors
+                                                ${isActive 
+                                                    ? `bg-red-100 text-red-700 border-l-4 border-red-600` 
+                                                    : `${colorClasses.text.secondary} hover:bg-red-50`
+                                                }
+                                            `}
+                                        >
+                                            <IconComponent className="w-5 h-5" />
+                                            <span className="font-medium">{nav.label}</span>
+                                        </NavLink>
+                                    );
+                                })}
+                            </>
+                        )}
                     </nav>
                 </div>
             </aside>

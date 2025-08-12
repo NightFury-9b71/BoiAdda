@@ -8,10 +8,8 @@ import {
   Edit,
   Camera,
   Book,
-  Heart,
   Gift,
-  Award,
-  Star
+  Award
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { PageHeader, Card, Button, Input, StatsCard, Badge } from '../components/ui/ThemeComponents.jsx';
@@ -199,18 +197,6 @@ const ProfilePage = () => {
               </div>
               
               <div className="flex items-start">
-                <div className={`p-2 rounded-full ${colorClasses.bg.info} mr-3 mt-1`}>
-                  <Heart className={`h-4 w-4 ${colorClasses.text.info}`} />
-                </div>
-                <div className="flex-1">
-                  <p className={`text-sm font-medium ${colorClasses.text.primary}`}>
-                    ৩টি বই উইশলিস্টে যোগ করেছেন
-                  </p>
-                  <p className={`text-xs ${colorClasses.text.tertiary}`}>৫ দিন আগে</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start">
                 <div className="p-2 rounded-full bg-purple-100 mr-3 mt-1">
                   <Gift className="h-4 w-4 text-purple-600" />
                 </div>
@@ -245,12 +231,6 @@ const ProfilePage = () => {
                 icon={Gift}
                 color="purple"
               />
-              <StatsCard
-                value="২৫"
-                label="উইশলিস্ট"
-                icon={Heart}
-                color="red"
-              />
             </div>
           </Card>
 
@@ -276,7 +256,7 @@ const ProfilePage = () => {
               
               <div className="flex items-center">
                 <div className="p-2 rounded-full bg-green-100 mr-3">
-                  <Star className="h-4 w-4 text-green-600" />
+                  <Gift className="h-4 w-4 text-green-600" />
                 </div>
                 <div>
                   <p className={`text-sm font-medium ${colorClasses.text.primary}`}>
@@ -300,13 +280,6 @@ const ProfilePage = () => {
                 <Calendar className={`h-4 w-4 ${colorClasses.text.tertiary} mr-2`} />
                 <span className={colorClasses.text.secondary}>
                   যোগদান: জানুয়ারি ২০২৪
-                </span>
-              </div>
-              
-              <div className="flex items-center text-sm">
-                <Star className={`h-4 w-4 ${colorClasses.text.tertiary} mr-2`} />
-                <span className={colorClasses.text.secondary}>
-                  রেটিং: ৪.৮/৫
                 </span>
               </div>
             </div>

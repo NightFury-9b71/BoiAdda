@@ -46,10 +46,13 @@ const api = {
     return response.data;
   },
 
-  returnBook: async (userId) => {
-    const response = await apiClient.post(`/return/`, null, {
-      params: { user_id: userId },
-    });
+  returnBook: async (userId, bookCopyId = null) => {
+    const params = { user_id: userId };
+    if (bookCopyId) {
+      params.book_copy_id = bookCopyId;
+    }
+    
+    const response = await apiClient.post(`/return/`, null, { params });
     return response.data;
   },
 
@@ -181,8 +184,7 @@ const api = {
       joined_date: "2025-01-01",
       total_borrowed: 15,
       total_donated: 3,
-      reading_streak: 7,
-      favorite_genres: ["Fiction", "Mystery", "Science"]
+      reading_streak: 7
     };
   },
 

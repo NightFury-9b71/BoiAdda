@@ -1,11 +1,10 @@
 import { Link } from 'react-router-dom';
 import { 
   BookOpen, 
-  Heart, 
+  Gift, 
   Users, 
   TrendingUp,
   Book,
-  Gift,
   User
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -111,7 +110,7 @@ const Dashboard = () => {
                     <StatsCard
                         value="১২"
                         label="দান করা বই"
-                        icon={Heart}
+                        icon={Gift}
                         color="purple"
                     />
                     <StatsCard

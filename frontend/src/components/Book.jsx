@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { 
   BookOpen, 
-  Heart, 
   Eye, 
   Calendar,
   User as UserIcon,
-  Star,
   Clock,
   CheckCircle,
   AlertCircle
@@ -16,7 +14,6 @@ import { Button, Badge } from './ui/ThemeComponents.jsx';
 import { colorClasses } from '../styles/colors.js';
 
 const Book = ({ book }) => {
-    const [isWishlisted, setIsWishlisted] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const borrowMutation = useBorrowBook();
@@ -42,11 +39,6 @@ const Book = ({ book }) => {
         } finally {
             setIsLoading(false);
         }
-    };
-
-    const handleWishlistToggle = () => {
-        setIsWishlisted(!isWishlisted);
-        // TODO: Implement wishlist API call
     };
 
     const getAvailabilityBadge = () => {
@@ -121,20 +113,8 @@ const Book = ({ book }) => {
                             isHovered ? 'from-black/90 via-black/60' : ''
                         }`}>
                             
-                            {/* Top Section - Status and Wishlist */}
-                            <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
-                                {/* Wishlist Button */}
-                                <button
-                                    onClick={handleWishlistToggle}
-                                    className={`p-2 rounded-full backdrop-blur-sm transition-all duration-300 ${
-                                        isWishlisted 
-                                            ? 'bg-red-500 text-white shadow-lg' 
-                                            : 'bg-white/20 text-white hover:bg-white/30 hover:scale-110'
-                                    }`}
-                                >
-                                    <Heart className={`h-4 w-4 ${isWishlisted ? 'fill-current' : ''}`} />
-                                </button>
-                                
+                            {/* Top Section - Status */}
+                            <div className="absolute top-3 right-3">
                                 {/* Status Badge */}
                                 <div className="bg-white/20 backdrop-blur-sm rounded-lg">
                                     {getAvailabilityBadge()}
@@ -145,16 +125,6 @@ const Book = ({ book }) => {
                             <div className={`absolute bottom-0 left-0 right-0 p-4 transform transition-all duration-300 ${
                                 isHovered ? 'translate-y-0' : 'translate-y-2'
                             }`}>
-                                
-                                {/* Rating */}
-                                <div className="flex items-center mb-2">
-                                    <div className="flex items-center bg-black/40 backdrop-blur-sm rounded-full px-2 py-1">
-                                        <Star className="h-3 w-3 text-yellow-400 fill-current mr-1" />
-                                        <span className="text-white text-xs font-medium">
-                                            {book.rating || '4.0'}
-                                        </span>
-                                    </div>
-                                </div>
 
                                 {/* Title */}
                                 <h3 className="font-bold text-lg text-white mb-1 line-clamp-2 leading-tight drop-shadow-lg">

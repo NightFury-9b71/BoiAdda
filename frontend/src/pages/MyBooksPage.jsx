@@ -10,223 +10,288 @@ import {
   Filter,
   Search,
   BookOpen,
-  Heart,
   Eye
 } from 'lucide-react';
 import { PageHeader, Card, Button, Input, Badge, EmptyState, LoadingSpinner } from '../components/ui/ThemeComponents.jsx';
 import { colorClasses } from '../styles/colors.js';
+import { useAuth } from '../context/AuthContext.jsx';
 import api from '../api.js';
 
 const MyBooksPage = () => {
   const [activeTab, setActiveTab] = useState('borrowed');
-  const [books, setBooks] = useState([]);
+  const [userStats, setUserStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [actionLoading, setActionLoading] = useState({});
+  const { user } = useAuth();
 
   useEffect(() => {
-    loadBooks();
-  }, [activeTab]);
+    if (user?.id) {
+      loadUserData();
+    }
+  }, [user]);
 
-  const loadBooks = async () => {
+  const loadUserData = async () => {
+    if (!user?.id) return;
+    
     setLoading(true);
     try {
-      // This would typically call different endpoints based on activeTab
-      // For now, we'll simulate with sample data
-      const sampleBooks = [
-        {
-          id: 1,
-          title: 'বাংলা সাহিত্যের ইতিহাস',
-          author: 'ড. মুহাম্মদ শহীদুল্লাহ',
-          cover: '/book1.png',
-          borrowedDate: '২০২৪-০১-১৫',
-          dueDate: '২০২৪-০২-১৫',
-          status: 'borrowed',
-          daysLeft: 5
-        },
-        {
-          id: 2,
-          title: 'রবীন্দ্রনাথের গল্প',
-          author: 'রবীন্দ্রনাথ ঠাকুর',
-          cover: '/book2.png',
-          borrowedDate: '২০২৪-০১-১০',
-          returnedDate: '২০২৪-০২-০৮',
-          status: 'returned'
-        },
-        {
-          id: 3,
-          title: 'আধুনিক বাংলা কবিতা',
-          author: 'বিভিন্ন কবি',
-          cover: '/book3.png',
-          status: 'wishlist',
-          addedDate: '২০২৪-০১-২০'
-        }
-      ];
-      setBooks(sampleBooks);
+      const stats = await api.getUserStatistics(user.id);
+      setUserStats(stats);
     } catch (error) {
-      console.error('Error loading books:', error);
+      console.error('Error loading user data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredBooks = books.filter(book => {
-    const matchesTab = activeTab === 'borrowed' 
-      ? book.status === 'borrowed'
-      : activeTab === 'history'
-      ? book.status === 'returned'
-      : activeTab === 'wishlist'
-      ? book.status === 'wishlist'
-      : true;
+  // Get books based on active tab from user statistics
+  const getFilteredBooks = () => {
+    if (!userStats) return [];
 
-    const matchesSearch = book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         book.author.toLowerCase().includes(searchTerm.toLowerCase());
+    let books = [];
+    
+    switch (activeTab) {
+      case 'borrowed':
+        books = userStats.borrowed_books.filter(book => 
+          book.status === 'Current' || book.status === 'Overdue'
+        );
+        break;
+      case 'history':
+        books = userStats.borrowed_books.filter(book => 
+          book.status === 'Returned'
+        );
+        break;
+      case 'pending':
+        books = userStats.borrowed_books.filter(book => 
+          book.status === 'Pending'
+        );
+        break;
+      case 'donations':
+        books = userStats.donated_books;
+        break;
+      default:
+        books = userStats.borrowed_books;
+    }
 
-    const matchesFilter = filterStatus === 'all' || book.status === filterStatus;
+    // Apply search filter
+    if (searchTerm) {
+      books = books.filter(book => 
+        book.book_title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        book.book_author.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
 
-    return matchesTab && matchesSearch && matchesFilter;
-  });
+    // Apply status filter
+    if (filterStatus !== 'all') {
+      books = books.filter(book => 
+        book.status.toLowerCase() === filterStatus.toLowerCase()
+      );
+    }
+
+    return books;
+  };
+
+  const filteredBooks = getFilteredBooks();
 
   const handleRenew = async (bookId) => {
+    setActionLoading(prev => ({ ...prev, [`renew_${bookId}`]: true }));
     try {
-      // API call to renew book
+      // TODO: Implement book renewal API
       console.log('Renewing book:', bookId);
-      // Update local state or reload
+      // Reload data after successful renewal
+      await loadUserData();
     } catch (error) {
       console.error('Error renewing book:', error);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [`renew_${bookId}`]: false }));
     }
   };
 
-  const handleReturn = async (bookId) => {
+  const handleReturn = async (bookCopyId) => {
+    setActionLoading(prev => ({ ...prev, [`return_${bookCopyId}`]: true }));
     try {
-      // API call to return book
-      console.log('Returning book:', bookId);
-      // Update local state or reload
+      await api.returnBook(user.id, bookCopyId);
+      // Reload data after successful return
+      await loadUserData();
     } catch (error) {
       console.error('Error returning book:', error);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [`return_${bookCopyId}`]: false }));
     }
   };
 
-  const handleRemoveFromWishlist = async (bookId) => {
+  const handleRemovePendingRequest = async (requestId) => {
+    setActionLoading(prev => ({ ...prev, [`remove_${requestId}`]: true }));
     try {
-      // API call to remove from wishlist
-      console.log('Removing from wishlist:', bookId);
-      setBooks(books.filter(book => book.id !== bookId));
+      // TODO: Implement cancel pending request API
+      console.log('Canceling pending request:', requestId);
+      await loadUserData();
     } catch (error) {
-      console.error('Error removing from wishlist:', error);
+      console.error('Error canceling request:', error);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [`remove_${requestId}`]: false }));
     }
   };
 
   const getStatusBadge = (book) => {
     switch (book.status) {
-      case 'borrowed':
-        if (book.daysLeft <= 3) {
-          return <Badge variant="error" icon={AlertCircle}>শীঘ্রই মেয়াদ শেষ</Badge>;
-        }
-        return <Badge variant="success" icon={CheckCircle}>ধার নেওয়া</Badge>;
-      case 'returned':
+      case 'Current':
+        return <Badge variant="success" icon={CheckCircle}>বর্তমানে ধার</Badge>;
+      case 'Overdue':
+        return <Badge variant="error" icon={AlertCircle}>মেয়াদ শেষ</Badge>;
+      case 'Returned':
         return <Badge variant="info" icon={CheckCircle}>ফেরত দেওয়া</Badge>;
-      case 'wishlist':
-        return <Badge variant="warning" icon={Heart}>উইশলিস্ট</Badge>;
+      case 'Pending':
+        return <Badge variant="warning" icon={Clock}>অপেক্ষমাণ</Badge>;
+      case 'Rejected':
+        return <Badge variant="error" icon={AlertCircle}>প্রত্যাখ্যাত</Badge>;
+      case 'Approved': // For donations
+        return <Badge variant="success" icon={CheckCircle}>অনুমোদিত</Badge>;
       default:
-        return null;
+        return <Badge variant="info">{book.status}</Badge>;
     }
   };
 
-  const BookCard = ({ book }) => (
-    <Card className="hover:shadow-lg transition-all duration-200">
-      <div className="flex">
-        <img
-          src={book.cover}
-          alt={book.title}
-          className="w-20 h-28 object-cover rounded-md"
-          onError={(e) => {
-            e.target.src = "https://via.placeholder.com/300x400/22c55e/ffffff?text=বই";
-          }}
-        />
-        
-        <div className="flex-1 ml-4">
-          <div className="flex items-start justify-between mb-2">
-            <div>
-              <h3 className={`font-semibold ${colorClasses.text.primary} line-clamp-1`}>
-                {book.title}
-              </h3>
-              <p className={`text-sm ${colorClasses.text.secondary}`}>{book.author}</p>
+  const BookCard = ({ book }) => {
+    const isDonation = activeTab === 'donations';
+    
+    return (
+      <Card className="hover:shadow-lg transition-all duration-200">
+        <div className="flex">
+          <img
+            src={book.cover_img || '/placeholder-book.svg'}
+            alt={book.book_title}
+            className="w-20 h-28 object-cover rounded-md"
+            onError={(e) => {
+              e.target.src = "https://via.placeholder.com/300x400/22c55e/ffffff?text=বই";
+            }}
+          />
+          
+          <div className="flex-1 ml-4">
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <h3 className={`font-semibold ${colorClasses.text.primary} line-clamp-1`}>
+                  {book.book_title}
+                </h3>
+                <p className={`text-sm ${colorClasses.text.secondary}`}>{book.book_author}</p>
+                <p className={`text-xs ${colorClasses.text.tertiary}`}>{book.book_category}</p>
+              </div>
+              {getStatusBadge(book)}
             </div>
-            {getStatusBadge(book)}
-          </div>
 
-          <div className="space-y-1 text-xs text-gray-500 mb-3">
-            {book.borrowedDate && (
-              <div className="flex items-center">
-                <Calendar className="h-3 w-3 mr-1" />
-                ধার: {book.borrowedDate}
-              </div>
-            )}
-            {book.dueDate && (
-              <div className={`flex items-center ${book.daysLeft <= 3 ? 'text-red-600' : ''}`}>
-                <Clock className="h-3 w-3 mr-1" />
-                ফেরত: {book.dueDate} {book.daysLeft && `(${book.daysLeft} দিন বাকি)`}
-              </div>
-            )}
-            {book.returnedDate && (
-              <div className="flex items-center">
-                <CheckCircle className="h-3 w-3 mr-1" />
-                ফেরত: {book.returnedDate}
-              </div>
-            )}
-            {book.addedDate && (
-              <div className="flex items-center">
-                <Heart className="h-3 w-3 mr-1" />
-                যোগ করা: {book.addedDate}
-              </div>
-            )}
-          </div>
+            <div className="space-y-1 text-xs text-gray-500 mb-3">
+              {!isDonation && book.borrowed_date && (
+                <div className="flex items-center">
+                  <Calendar className="h-3 w-3 mr-1" />
+                  ধার: {new Date(book.borrowed_date).toLocaleDateString('bn-BD')}
+                </div>
+              )}
+              {!isDonation && book.due_date && (book.status === 'Current' || book.status === 'Overdue') && (
+                <div className={`flex items-center ${book.is_overdue ? 'text-red-600' : ''}`}>
+                  <Clock className="h-3 w-3 mr-1" />
+                  ফেরত: {new Date(book.due_date).toLocaleDateString('bn-BD')} 
+                  {book.is_overdue && ' (মেয়াদ শেষ)'}
+                </div>
+              )}
+              {!isDonation && book.return_date && (
+                <div className="flex items-center">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  ফেরত: {new Date(book.return_date).toLocaleDateString('bn-BD')}
+                </div>
+              )}
+              {isDonation && book.donation_date && (
+                <div className="flex items-center">
+                  <Calendar className="h-3 w-3 mr-1" />
+                  দান: {new Date(book.donation_date).toLocaleDateString('bn-BD')}
+                </div>
+              )}
+              {book.admin_comment && (
+                <div className="flex items-start text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                  <AlertCircle className="h-3 w-3 mr-1 mt-0.5 flex-shrink-0" />
+                  <span>{book.admin_comment}</span>
+                </div>
+              )}
+            </div>
 
-          <div className="flex gap-2">
-            {book.status === 'borrowed' && (
-              <>
-                <Button size="sm" variant="success" onClick={() => handleRenew(book.id)}>
-                  <RotateCcw className="h-3 w-3 mr-1" />
-                  নবায়ন
+            <div className="flex gap-2">
+              {(book.status === 'Current' || book.status === 'Overdue') && (
+                <>
+                  <Button 
+                    size="sm" 
+                    variant="success" 
+                    onClick={() => handleRenew(book.id)}
+                    disabled={actionLoading[`renew_${book.id}`]}
+                    loading={actionLoading[`renew_${book.id}`]}
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    নবায়ন
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="secondary" 
+                    onClick={() => handleReturn(book.book_copy_id)}
+                    disabled={actionLoading[`return_${book.book_copy_id}`]}
+                    loading={actionLoading[`return_${book.book_copy_id}`]}
+                  >
+                    ফেরত দিন
+                  </Button>
+                </>
+              )}
+              
+              {book.status === 'Pending' && (
+                <Button size="sm" variant="warning" disabled>
+                  <Clock className="h-3 w-3 mr-1" />
+                  অপেক্ষায়
                 </Button>
-                <Button size="sm" variant="secondary" onClick={() => handleReturn(book.id)}>
-                  ফেরত দিন
-                </Button>
-              </>
-            )}
-            
-            {book.status === 'wishlist' && (
-              <>
-                <Button size="sm" variant="primary">
-                  <BookOpen className="h-3 w-3 mr-1" />
-                  ধার নিন
-                </Button>
+              )}
+              
+              {isDonation && book.status === 'Pending' && (
                 <Button 
                   size="sm" 
                   variant="danger" 
-                  onClick={() => handleRemoveFromWishlist(book.id)}
+                  onClick={() => handleRemovePendingRequest(book.id)}
+                  disabled={actionLoading[`remove_${book.id}`]}
+                  loading={actionLoading[`remove_${book.id}`]}
                 >
                   <Trash2 className="h-3 w-3 mr-1" />
-                  মুছুন
+                  বাতিল
                 </Button>
-              </>
-            )}
-            
-            <Button size="sm" variant="ghost">
-              <Eye className="h-3 w-3 mr-1" />
-              দেখুন
-            </Button>
+              )}
+              
+              <Button size="sm" variant="ghost">
+                <Eye className="h-3 w-3 mr-1" />
+                দেখুন
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
-    </Card>
-  );
+      </Card>
+    );
+  };
 
   const tabs = [
-    { id: 'borrowed', label: 'বর্তমানে ধার', count: books.filter(b => b.status === 'borrowed').length },
-    { id: 'history', label: 'ইতিহাস', count: books.filter(b => b.status === 'returned').length },
-    { id: 'wishlist', label: 'উইশলিস্ট', count: books.filter(b => b.status === 'wishlist').length }
+    { 
+      id: 'borrowed', 
+      label: 'বর্তমানে ধার', 
+      count: userStats ? userStats.current_borrowed : 0 
+    },
+    { 
+      id: 'history', 
+      label: 'ইতিহাস', 
+      count: userStats ? userStats.borrowed_books.filter(b => b.status === 'Returned').length : 0 
+    },
+    { 
+      id: 'pending', 
+      label: 'অপেক্ষমাণ', 
+      count: userStats ? userStats.pending_borrow_requests : 0 
+    },
+    { 
+      id: 'donations', 
+      label: 'দান', 
+      count: userStats ? userStats.total_donated : 0 
+    }
   ];
 
   return (
@@ -234,101 +299,158 @@ const MyBooksPage = () => {
       {/* Header */}
       <PageHeader
         title="আমার বই"
-        subtitle="আপনার ধার নেওয়া বই, ইতিহাস এবং উইশলিস্ট পরিচালনা করুন"
+        subtitle="আপনার ধার নেওয়া বই, ইতিহাস এবং দান পরিচালনা করুন"
       />
 
-      {/* Tabs */}
-      <Card padding="p-0">
-        <div className="flex border-b border-gray-200">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
-                activeTab === tab.id
-                  ? `${colorClasses.text.accent} border-b-2 border-green-500 bg-green-50`
-                  : `${colorClasses.text.secondary} hover:text-gray-900`
-              }`}
-            >
-              {tab.label}
-              <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
-                activeTab === tab.id
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-gray-100 text-gray-600'
-              }`}>
-                {tab.count}
-              </span>
-            </button>
-          ))}
-        </div>
-      </Card>
-
-      {/* Search and Filters */}
-      <Card>
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <Input
-              icon={Search}
-              placeholder="বইয়ের নাম বা লেখকের নাম খুঁজুন..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          
-          <div className="md:w-48">
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className={`w-full px-3 py-2 border ${colorClasses.border.primary} rounded-md focus:outline-none focus:ring-2 ${colorClasses.ring.accent}`}
-            >
-              <option value="all">সব অবস্থা</option>
-              <option value="borrowed">ধার নেওয়া</option>
-              <option value="returned">ফেরত দেওয়া</option>
-              <option value="wishlist">উইশলিস্ট</option>
-            </select>
-          </div>
-        </div>
-      </Card>
-
-      {/* Books List */}
       {loading ? (
         <div className="flex justify-center items-center py-12">
           <div className="text-center">
             <LoadingSpinner size="lg" className="mx-auto mb-4" />
-            <p className={colorClasses.text.secondary}>বই লোড হচ্ছে...</p>
+            <p className={colorClasses.text.secondary}>ডেটা লোড হচ্ছে...</p>
           </div>
         </div>
-      ) : filteredBooks.length === 0 ? (
+      ) : !user ? (
         <EmptyState
           icon={BookOpen}
-          title="কোন বই পাওয়া যায়নি"
-          description={
-            searchTerm 
-              ? "আপনার অনুসন্ধানের সাথে মিলে এমন কোন বই পাওয়া যায়নি।"
-              : activeTab === 'borrowed'
-              ? "আপনি এখনো কোন বই ধার নেননি।"
-              : activeTab === 'history'
-              ? "আপনার কোন বই ফেরতের ইতিহাস নেই।"
-              : "আপনার উইশলিস্ট খালি।"
-          }
-          action={
-            activeTab === 'borrowed' && (
-              <Button variant="primary">বই খুঁজুন</Button>
-            )
-          }
+          title="লগইন প্রয়োজন"
+          description="আপনার বইয়ের তথ্য দেখতে অনুগ্রহ করে লগইন করুন।"
         />
       ) : (
-        <div className="space-y-4">
-          <p className={`text-sm ${colorClasses.text.secondary}`}>
-            {filteredBooks.length} টি বই পাওয়া গেছে
-          </p>
-          
-          <div className="grid gap-4">
-            {filteredBooks.map((book) => (
-              <BookCard key={book.id} book={book} />
-            ))}
-          </div>
-        </div>
+        <>
+          {/* Statistics Cards */}
+          {userStats && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <div className="text-center p-4">
+                  <div className={`text-2xl font-bold ${colorClasses.text.accent}`}>
+                    {userStats.current_borrowed}
+                  </div>
+                  <div className={`text-sm ${colorClasses.text.secondary}`}>বর্তমানে ধার</div>
+                </div>
+              </Card>
+              <Card>
+                <div className="text-center p-4">
+                  <div className={`text-2xl font-bold ${colorClasses.text.primary}`}>
+                    {userStats.total_borrowed}
+                  </div>
+                  <div className={`text-sm ${colorClasses.text.secondary}`}>মোট ধার</div>
+                </div>
+              </Card>
+              <Card>
+                <div className="text-center p-4">
+                  <div className={`text-2xl font-bold ${userStats.overdue_books > 0 ? 'text-red-600' : colorClasses.text.primary}`}>
+                    {userStats.overdue_books}
+                  </div>
+                  <div className={`text-sm ${colorClasses.text.secondary}`}>মেয়াদোত্তীর্ণ</div>
+                </div>
+              </Card>
+              <Card>
+                <div className="text-center p-4">
+                  <div className={`text-2xl font-bold ${colorClasses.text.accent}`}>
+                    {userStats.total_donated}
+                  </div>
+                  <div className={`text-sm ${colorClasses.text.secondary}`}>মোট দান</div>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* Tabs */}
+          <Card padding="p-0">
+            <div className="flex border-b border-gray-200">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
+                    activeTab === tab.id
+                      ? `${colorClasses.text.accent} border-b-2 border-green-500 bg-green-50`
+                      : `${colorClasses.text.secondary} hover:text-gray-900`
+                  }`}
+                >
+                  {tab.label}
+                  <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
+                    activeTab === tab.id
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Card>
+
+          {/* Search and Filters */}
+          <Card>
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <Input
+                  icon={Search}
+                  placeholder="বইয়ের নাম বা লেখকের নাম খুঁজুন..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              
+              <div className="md:w-48">
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className={`w-full px-3 py-2 border ${colorClasses.border.primary} rounded-md focus:outline-none focus:ring-2 ${colorClasses.ring.accent}`}
+                >
+                  <option value="all">সব অবস্থা</option>
+                  <option value="current">বর্তমানে ধার</option>
+                  <option value="returned">ফেরত দেওয়া</option>
+                  <option value="pending">অপেক্ষমাণ</option>
+                  <option value="overdue">মেয়াদোত্তীর্ণ</option>
+                  {activeTab === 'donations' && (
+                    <>
+                      <option value="approved">অনুমোদিত</option>
+                      <option value="rejected">প্রত্যাখ্যাত</option>
+                    </>
+                  )}
+                </select>
+              </div>
+            </div>
+          </Card>
+
+          {/* Books List */}
+          {filteredBooks.length === 0 ? (
+            <EmptyState
+              icon={BookOpen}
+              title="কোন বই পাওয়া যায়নি"
+              description={
+                searchTerm 
+                  ? "আপনার অনুসন্ধানের সাথে মিলে এমন কোন বই পাওয়া যায়নি।"
+                  : activeTab === 'borrowed'
+                  ? "আপনি এখনো কোন বই ধার নেননি।"
+                  : activeTab === 'history'
+                  ? "আপনার কোন বই ফেরতের ইতিহাস নেই।"
+                  : activeTab === 'pending'
+                  ? "আপনার কোন অপেক্ষমাণ অনুরোধ নেই।"
+                  : "আপনার কোন দানের ইতিহাস নেই।"
+              }
+              action={
+                activeTab === 'borrowed' && (
+                  <Button variant="primary">বই খুঁজুন</Button>
+                )
+              }
+            />
+          ) : (
+            <div className="space-y-4">
+              <p className={`text-sm ${colorClasses.text.secondary}`}>
+                {filteredBooks.length} টি বই পাওয়া গেছে
+              </p>
+              
+              <div className="grid gap-4">
+                {filteredBooks.map((book) => (
+                  <BookCard key={`${book.id}_${activeTab}`} book={book} />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
