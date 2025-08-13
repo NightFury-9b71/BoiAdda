@@ -190,6 +190,13 @@ class BorrowRequestInput(BaseModel):
 class DonationRequestInput(BaseModel):
     user_id: int
 
+class BookDonationInput(BaseModel):
+    title: str
+    author: str
+    description: Optional[str] = None
+    cover_img: Optional[str] = None
+    category: str = "সাধারণ"  # Default category
+
 class AdminActionInput(BaseModel):
     admin_id: int
     comment: Optional[str] = None
@@ -486,6 +493,48 @@ def request_borrow(book_id: int, req: BorrowRequestInput, db: Session = Depends(
     db.refresh(txn)
     return {"message": "Borrow request submitted", "borrow_txn_id": txn.id, "copy_id": copy.id}
 
+@app.post("/donate", tags=["public"])
+def create_book_donation(book_data: BookDonationInput, current_user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
+    """Create a new book and submit it for donation"""
+    # Check if user exists
+    user = db.get(User, current_user_id)
+    if not user:
+        raise HTTPException(404, detail="User not found.")
+    
+    # Generate a simple ISBN for donated books
+    import uuid
+    simple_isbn = f"DONATED-{str(uuid.uuid4())[:8].upper()}"
+    
+    # Create new book
+    new_book = Book(
+        title=book_data.title,
+        author=book_data.author,
+        isbn=simple_isbn,
+        description=book_data.description,
+        category=book_data.category,
+        cover_img=book_data.cover_img,
+        donor_id=current_user_id
+    )
+    db.add(new_book)
+    db.flush()  # Flush to get the book ID
+    
+    # Create donation transaction
+    txn = DonationTransaction(
+        user_id=current_user_id,
+        book_id=new_book.id,
+        status=TransactionStatus.PENDING
+    )
+    db.add(txn)
+    db.commit()
+    db.refresh(new_book)
+    db.refresh(txn)
+    
+    return {
+        "message": "Book donation submitted successfully", 
+        "book_id": new_book.id,
+        "donation_txn_id": txn.id
+    }
+
 @app.post("/donate/{book_id}", tags=["public"])
 def request_donation(book_id: int, req: DonationRequestInput, db: Session = Depends(get_db)):
     # Check if user exists
@@ -580,19 +629,138 @@ def get_user_borrowed_books(user_id: int, db: Session = Depends(get_db)):
 
 # ========== ADMIN ROUTES ==========
 
-@app.get("/admin/borrow-requests/", response_model=List[BorrowTransaction], tags=["admin"])
+# Response models for admin endpoints
+class AdminBorrowRequest(BaseModel):
+    id: int
+    user_id: int
+    book_copy_id: int
+    due_date: Optional[datetime]
+    status: TransactionStatus
+    created_at: datetime
+    updated_at: Optional[datetime]
+    admin_id: Optional[int]
+    admin_comment: Optional[str]
+    user: UserInfo
+    book: BookInfo
+
+class AdminDonationRequest(BaseModel):
+    id: int
+    user_id: int
+    book_id: int
+    status: TransactionStatus
+    created_at: datetime
+    updated_at: Optional[datetime]
+    admin_id: Optional[int]
+    admin_comment: Optional[str]
+    user: UserInfo
+    book: BookInfo
+
+@app.get("/admin/borrow-requests/", response_model=List[AdminBorrowRequest], tags=["admin"])
 def list_pending_borrow(db: Session = Depends(get_db)):
     txs = db.exec(
-        select(BorrowTransaction).where(BorrowTransaction.status == TransactionStatus.PENDING)
+        select(BorrowTransaction, BookCopy, Book, User, Role).join(
+            BookCopy, BorrowTransaction.book_copy_id == BookCopy.id
+        ).join(
+            Book, BookCopy.book_id == Book.id
+        ).join(
+            User, BorrowTransaction.user_id == User.id
+        ).join(
+            Role, User.role_id == Role.id
+        ).where(BorrowTransaction.status == TransactionStatus.PENDING)
     ).all()
-    return txs
+    
+    result = []
+    for txn, copy, book, user, role in txs:
+        # Count available copies for the book
+        available_copies = db.exec(
+            select(BookCopy).where(
+                (BookCopy.book_id == book.id) & 
+                (BookCopy.status == BookStatus.AVAILABLE)
+            )
+        ).all()
+        
+        result.append(AdminBorrowRequest(
+            id=txn.id,
+            user_id=txn.user_id,
+            book_copy_id=txn.book_copy_id,
+            due_date=txn.due_date,
+            status=txn.status,
+            created_at=txn.created_at,
+            updated_at=txn.updated_at,
+            admin_id=txn.admin_id,
+            admin_comment=txn.admin_comment,
+            user=UserInfo(
+                id=user.id,
+                name=user.name,
+                email=user.email,
+                phone=user.phone,
+                role_name=role.role_name.value
+            ),
+            book=BookInfo(
+                id=book.id,
+                title=book.title,
+                author=book.author,
+                category=book.category,
+                available_copies=len(available_copies),
+                description=book.description,
+                isbn=book.isbn,
+                cover_img=book.cover_img,
+                user_can_borrow=True
+            )
+        ))
+    return result
 
-@app.get("/admin/donation-requests/", response_model=List[DonationTransaction], tags=["admin"])
+@app.get("/admin/donation-requests/", response_model=List[AdminDonationRequest], tags=["admin"])
 def list_pending_donations(db: Session = Depends(get_db)):
     txs = db.exec(
-        select(DonationTransaction).where(DonationTransaction.status == TransactionStatus.PENDING)
+        select(DonationTransaction, Book, User, Role).join(
+            Book, DonationTransaction.book_id == Book.id
+        ).join(
+            User, DonationTransaction.user_id == User.id
+        ).join(
+            Role, User.role_id == Role.id
+        ).where(DonationTransaction.status == TransactionStatus.PENDING)
     ).all()
-    return txs
+    
+    result = []
+    for txn, book, user, role in txs:
+        # Count available copies for the book
+        available_copies = db.exec(
+            select(BookCopy).where(
+                (BookCopy.book_id == book.id) & 
+                (BookCopy.status == BookStatus.AVAILABLE)
+            )
+        ).all()
+        
+        result.append(AdminDonationRequest(
+            id=txn.id,
+            user_id=txn.user_id,
+            book_id=txn.book_id,
+            status=txn.status,
+            created_at=txn.created_at,
+            updated_at=txn.updated_at,
+            admin_id=txn.admin_id,
+            admin_comment=txn.admin_comment,
+            user=UserInfo(
+                id=user.id,
+                name=user.name,
+                email=user.email,
+                phone=user.phone,
+                role_name=role.role_name.value
+            ),
+            book=BookInfo(
+                id=book.id,
+                title=book.title,
+                author=book.author,
+                category=book.category,
+                available_copies=len(available_copies),
+                description=book.description,
+                isbn=book.isbn,
+                cover_img=book.cover_img,
+                user_can_borrow=True
+            )
+        ))
+    return result
 
 @app.post("/admin/borrow-requests/{tx_id}/approve", tags=["admin"])
 def approve_borrow(tx_id: int, input: AdminActionInput, db: Session = Depends(get_db)):
@@ -682,7 +850,103 @@ def reject_donation(tx_id: int, input: AdminActionInput, db: Session = Depends(g
     db.commit()
     return {"message": "Donation rejected."}
 
-# ===== USER STATISTICS ROUTES =====
+class RecentActivity(BaseModel):
+    id: str
+    type: str  # 'borrow', 'donation', 'return', 'member'
+    description: str
+    timestamp: datetime
+    user_name: Optional[str] = None
+    book_title: Optional[str] = None
+
+@app.get("/recent-activities", response_model=List[RecentActivity], tags=["public"])
+def get_recent_activities(limit: int = Query(10, le=50), db: Session = Depends(get_db)):
+    """Get recent activities across the library"""
+    activities = []
+    
+    # Get recent successful borrow transactions
+    recent_borrows = db.exec(
+        select(BorrowTransaction, User, BookCopy, Book).join(
+            User, BorrowTransaction.user_id == User.id
+        ).join(
+            BookCopy, BorrowTransaction.book_copy_id == BookCopy.id
+        ).join(
+            Book, BookCopy.book_id == Book.id
+        ).where(
+            BorrowTransaction.status == TransactionStatus.SUCCESS
+        ).order_by(BorrowTransaction.updated_at.desc()).limit(limit // 2)
+    ).all()
+    
+    for txn, user, copy, book in recent_borrows:
+        activities.append(RecentActivity(
+            id=f"borrow_{txn.id}",
+            type="borrow",
+            description=f"{user.name} ধার নিয়েছেন \"{book.title}\"",
+            timestamp=txn.updated_at or txn.created_at,
+            user_name=user.name,
+            book_title=book.title
+        ))
+    
+    # Get recent successful donation transactions
+    recent_donations = db.exec(
+        select(DonationTransaction, User, Book).join(
+            User, DonationTransaction.user_id == User.id
+        ).join(
+            Book, DonationTransaction.book_id == Book.id
+        ).where(
+            DonationTransaction.status == TransactionStatus.SUCCESS
+        ).order_by(DonationTransaction.updated_at.desc()).limit(limit // 2)
+    ).all()
+    
+    for txn, user, book in recent_donations:
+        activities.append(RecentActivity(
+            id=f"donation_{txn.id}",
+            type="donation",
+            description=f"{user.name} দান করেছেন \"{book.title}\"",
+            timestamp=txn.updated_at or txn.created_at,
+            user_name=user.name,
+            book_title=book.title
+        ))
+    
+    # Get recent returns (transactions with return_date)
+    recent_returns = db.exec(
+        select(BorrowTransaction, User, BookCopy, Book).join(
+            User, BorrowTransaction.user_id == User.id
+        ).join(
+            BookCopy, BorrowTransaction.book_copy_id == BookCopy.id
+        ).join(
+            Book, BookCopy.book_id == Book.id
+        ).where(
+            BorrowTransaction.return_date.isnot(None)
+        ).order_by(BorrowTransaction.return_date.desc()).limit(limit // 4)
+    ).all()
+    
+    for txn, user, copy, book in recent_returns:
+        activities.append(RecentActivity(
+            id=f"return_{txn.id}",
+            type="return", 
+            description=f"{user.name} ফেরত দিয়েছেন \"{book.title}\"",
+            timestamp=txn.return_date,
+            user_name=user.name,
+            book_title=book.title
+        ))
+    
+    # Get recent new users
+    recent_users = db.exec(
+        select(User).order_by(User.created_at.desc()).limit(limit // 4)
+    ).all()
+    
+    for user in recent_users:
+        activities.append(RecentActivity(
+            id=f"member_{user.id}",
+            type="member",
+            description=f"{user.name} নতুন সদস্য হিসেবে যোগ দিয়েছেন",
+            timestamp=user.created_at,
+            user_name=user.name
+        ))
+    
+    # Sort all activities by timestamp and return limited results
+    activities.sort(key=lambda x: x.timestamp, reverse=True)
+    return activities[:limit]
 
 class UserBorrowedBook(BaseModel):
     id: int

@@ -3,13 +3,15 @@ import { Book, User, FileText, Image, Users, Gift } from 'lucide-react';
 import { useDonateBook } from '../hooks/useBooks.js';
 import { PageHeader, Card, Button, Input } from '../components/ui/ThemeComponents.jsx';
 import { colorClasses } from '../styles/colors.js';
+import DemoHelper from '../components/DemoHelper.jsx';
 
 const DonatePage = () => {
     const [formData, setFormData] = useState({
         title: '',
         author: '',
         description: '',
-        cover_img: ''
+        cover_img: '',
+        category: 'সাধারণ'
     });
 
     const donateMutation = useDonateBook();
@@ -36,7 +38,8 @@ const DonatePage = () => {
                     title: '',
                     author: '',
                     description: '',
-                    cover_img: ''
+                    cover_img: '',
+                    category: 'সাধারণ'
                 });
             }
         });
@@ -47,8 +50,13 @@ const DonatePage = () => {
             title: '',
             author: '',
             description: '',
-            cover_img: ''
+            cover_img: '',
+            category: 'সাধারণ'
         });
+    };
+
+    const handleFillDemoData = (demoBook) => {
+        setFormData(demoBook);
     };
 
     return (
@@ -87,6 +95,29 @@ const DonatePage = () => {
                                 placeholder="লেখকের নাম লিখুন"
                                 required
                             />
+
+                            <div>
+                                <label className={`block text-sm font-medium ${colorClasses.text.secondary} mb-2`}>
+                                    <Book className="inline h-4 w-4 mr-1" />
+                                    বইয়ের ধরন
+                                </label>
+                                <select
+                                    name="category"
+                                    value={formData.category}
+                                    onChange={handleInputChange}
+                                    className={`w-full px-3 py-2 border ${colorClasses.border.primary} rounded-md focus:outline-none focus:ring-2 ${colorClasses.ring.accent} focus:border-transparent`}
+                                >
+                                    <option value="সাধারণ">সাধারণ</option>
+                                    <option value="উপন্যাস">উপন্যাস</option>
+                                    <option value="সাহিত্য">সাহিত্য</option>
+                                    <option value="ইতিহাস">ইতিহাস</option>
+                                    <option value="কাব্য">কাব্য</option>
+                                    <option value="বিজ্ঞান কল্পকাহিনি">বিজ্ঞান কল্পকাহিনি</option>
+                                    <option value="ধর্ম">ধর্ম</option>
+                                    <option value="শিক্ষা">শিক্ষা</option>
+                                    <option value="প্রযুক্তি">প্রযুক্তি</option>
+                                </select>
+                            </div>
 
                             <div>
                                 <label className={`block text-sm font-medium ${colorClasses.text.secondary} mb-2`}>
@@ -239,6 +270,12 @@ const DonatePage = () => {
                     </Card>
                 </div>
             </div>
+
+            {/* Demo Helper */}
+            <DemoHelper
+                currentPage="donate"
+                onFillDonate={handleFillDemoData}
+            />
         </div>
     );
 };

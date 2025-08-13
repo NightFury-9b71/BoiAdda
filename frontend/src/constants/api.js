@@ -3,7 +3,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localho
 export const ENDPOINTS = {
     ALL_BOOKS: "/books",
     BORROW_BOOK: (id) => `/borrow/${id}`,
-    DONATE_BOOK: "/books",
+    DONATE_BOOK: "/donate",
     USER_PROFILE: "/user/profile",
     USER_BORROWED_BOOKS: "/user/borrowed-books",
 };

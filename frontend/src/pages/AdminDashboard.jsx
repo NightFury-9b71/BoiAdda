@@ -33,6 +33,10 @@ const AdminDashboard = () => {
   const [adminComment, setAdminComment] = useState('');
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [actionType, setActionType] = useState(''); // 'approve' or 'reject'
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [showBookModal, setShowBookModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedBook, setSelectedBook] = useState(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -117,6 +121,20 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleUserClick = (user) => {
+    if (user) {
+      setSelectedUser(user);
+      setShowUserModal(true);
+    }
+  };
+
+  const handleBookClick = (book) => {
+    if (book) {
+      setSelectedBook(book);
+      setShowBookModal(true);
+    }
+  };
+
   const getFilteredRequests = () => {
     const requests = activeTab === 'borrow-requests' ? borrowRequests : donationRequests;
     
@@ -159,24 +177,51 @@ const AdminDashboard = () => {
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center">
                     <UserIcon className="h-4 w-4 mr-2 text-gray-400" />
-                    <span className={colorClasses.text.secondary}>
-                      {request.user?.name || `User ID: ${request.user_id}`}
-                    </span>
+                    {request.user ? (
+                      <button
+                        onClick={() => handleUserClick(request.user)}
+                        className={`${colorClasses.text.accent} hover:underline cursor-pointer font-medium`}
+                      >
+                        {request.user.name}
+                      </button>
+                    ) : (
+                      <span className={colorClasses.text.secondary}>
+                        User ID: {request.user_id}
+                      </span>
+                    )}
+                    {request.user?.email && (
+                      <span className={`ml-2 text-xs ${colorClasses.text.tertiary}`}>
+                        ({request.user.email})
+                      </span>
+                    )}
                   </div>
                   
                   <div className="flex items-center">
                     <BookMarked className="h-4 w-4 mr-2 text-gray-400" />
-                    <span className={colorClasses.text.secondary}>
-                      {request.book?.title || `Book ID: ${request.book_id}`}
-                    </span>
+                    {request.book ? (
+                      <button
+                        onClick={() => handleBookClick(request.book)}
+                        className={`${colorClasses.text.accent} hover:underline cursor-pointer font-medium`}
+                      >
+                        {request.book.title}
+                      </button>
+                    ) : (
+                      <span className={colorClasses.text.secondary}>
+                        Book ID: {request.book_id}
+                      </span>
+                    )}
                   </div>
                   
                   {request.book?.author && (
-                    <div className="flex items-center">
-                      <FileText className="h-4 w-4 mr-2 text-gray-400" />
-                      <span className={colorClasses.text.tertiary}>
-                        {request.book.author}
+                    <div className="flex items-center ml-6">
+                      <span className={`text-xs ${colorClasses.text.tertiary}`}>
+                        লেখক: {request.book.author}
                       </span>
+                      {request.book?.category && (
+                        <span className={`ml-2 px-2 py-1 rounded-full text-xs bg-gray-100 ${colorClasses.text.tertiary}`}>
+                          {request.book.category}
+                        </span>
+                      )}
                     </div>
                   )}
                   
@@ -262,6 +307,180 @@ const AdminDashboard = () => {
   ];
 
   const filteredRequests = getFilteredRequests();
+
+  // User Details Modal Component
+  const UserDetailsModal = () => (
+    showUserModal && selectedUser && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className={`text-lg font-semibold ${colorClasses.text.primary}`}>
+              ব্যবহারকারীর তথ্য
+            </h3>
+            <button
+              onClick={() => setShowUserModal(false)}
+              className={`p-1 rounded-full hover:bg-gray-100 ${colorClasses.text.tertiary}`}
+            >
+              <XCircle className="h-5 w-5" />
+            </button>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="flex items-center space-x-4">
+              <div className={`w-12 h-12 rounded-full ${colorClasses.bg.accent} flex items-center justify-center`}>
+                <UserIcon className={`h-6 w-6 ${colorClasses.text.accent}`} />
+              </div>
+              <div>
+                <h4 className={`font-medium ${colorClasses.text.primary}`}>
+                  {selectedUser.name}
+                </h4>
+                <p className={`text-sm ${colorClasses.text.tertiary}`}>
+                  {selectedUser.role_name === 'admin' ? 'অ্যাডমিন' : 'সাধারণ ব্যবহারকারী'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="border-t pt-4 space-y-3">
+              <div>
+                <label className={`text-xs font-medium ${colorClasses.text.secondary} uppercase tracking-wider`}>
+                  ইমেইল
+                </label>
+                <p className={`text-sm ${colorClasses.text.primary}`}>
+                  {selectedUser.email}
+                </p>
+              </div>
+              
+              {selectedUser.phone && (
+                <div>
+                  <label className={`text-xs font-medium ${colorClasses.text.secondary} uppercase tracking-wider`}>
+                    ফোন
+                  </label>
+                  <p className={`text-sm ${colorClasses.text.primary}`}>
+                    {selectedUser.phone}
+                  </p>
+                </div>
+              )}
+              
+              <div>
+                <label className={`text-xs font-medium ${colorClasses.text.secondary} uppercase tracking-wider`}>
+                  ব্যবহারকারী আইডি
+                </label>
+                <p className={`text-sm ${colorClasses.text.primary}`}>
+                  {selectedUser.id}
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-6">
+            <Button
+              variant="secondary"
+              onClick={() => setShowUserModal(false)}
+              className="w-full"
+            >
+              বন্ধ করুন
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  );
+
+  // Book Details Modal Component
+  const BookDetailsModal = () => (
+    showBookModal && selectedBook && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className={`text-lg font-semibold ${colorClasses.text.primary}`}>
+              বইয়ের তথ্য
+            </h3>
+            <button
+              onClick={() => setShowBookModal(false)}
+              className={`p-1 rounded-full hover:bg-gray-100 ${colorClasses.text.tertiary}`}
+            >
+              <XCircle className="h-5 w-5" />
+            </button>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="flex items-start space-x-4">
+              <div className="flex-shrink-0">
+                {selectedBook.cover_img ? (
+                  <img
+                    src={selectedBook.cover_img}
+                    alt={selectedBook.title}
+                    className="w-16 h-20 object-cover rounded-md"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div className={`w-16 h-20 rounded-md ${colorClasses.bg.secondary} flex items-center justify-center ${selectedBook.cover_img ? 'hidden' : ''}`}>
+                  <BookOpen className={`h-8 w-8 ${colorClasses.text.accent}`} />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h4 className={`font-medium ${colorClasses.text.primary} mb-1`}>
+                  {selectedBook.title}
+                </h4>
+                <p className={`text-sm ${colorClasses.text.secondary} mb-2`}>
+                  {selectedBook.author}
+                </p>
+                {selectedBook.category && (
+                  <span className={`inline-block px-2 py-1 rounded-full text-xs bg-gray-100 ${colorClasses.text.tertiary}`}>
+                    {selectedBook.category}
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            {selectedBook.description && (
+              <div>
+                <label className={`text-xs font-medium ${colorClasses.text.secondary} uppercase tracking-wider`}>
+                  বিবরণ
+                </label>
+                <p className={`text-sm ${colorClasses.text.primary} mt-1`}>
+                  {selectedBook.description}
+                </p>
+              </div>
+            )}
+            
+            <div className="border-t pt-4 space-y-3">
+              <div>
+                <label className={`text-xs font-medium ${colorClasses.text.secondary} uppercase tracking-wider`}>
+                  ISBN
+                </label>
+                <p className={`text-sm ${colorClasses.text.primary}`}>
+                  {selectedBook.isbn}
+                </p>
+              </div>
+              
+              <div>
+                <label className={`text-xs font-medium ${colorClasses.text.secondary} uppercase tracking-wider`}>
+                  বই আইডি
+                </label>
+                <p className={`text-sm ${colorClasses.text.primary}`}>
+                  {selectedBook.id}
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-6">
+            <Button
+              variant="secondary"
+              onClick={() => setShowBookModal(false)}
+              className="w-full"
+            >
+              বন্ধ করুন
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  );
 
   // Comment Modal Component
   const CommentModal = () => (
@@ -426,7 +645,9 @@ const AdminDashboard = () => {
         </>
       )}
 
-      {/* Comment Modal */}
+      {/* Modals */}
+      <UserDetailsModal />
+      <BookDetailsModal />
       <CommentModal />
     </div>
   );

@@ -78,4 +78,47 @@ export const bookService = {
     }
 };
 
+// Admin API functions
+api.getBorrowRequests = async () => {
+    const response = await api.get('/admin/borrow-requests/');
+    return response.data;
+};
+
+api.getDonationRequests = async () => {
+    const response = await api.get('/admin/donation-requests/');
+    return response.data;
+};
+
+api.approveBorrow = async ({ txId, adminId, comment }) => {
+    const response = await api.post(`/admin/borrow-requests/${txId}/approve`, {
+        admin_id: adminId,
+        comment: comment
+    });
+    return response.data;
+};
+
+api.rejectBorrow = async ({ txId, adminId, comment }) => {
+    const response = await api.post(`/admin/borrow-requests/${txId}/reject`, {
+        admin_id: adminId,
+        comment: comment
+    });
+    return response.data;
+};
+
+api.approveDonation = async ({ txId, adminId, comment }) => {
+    const response = await api.post(`/admin/donation-requests/${txId}/approve`, {
+        admin_id: adminId,
+        comment: comment
+    });
+    return response.data;
+};
+
+api.rejectDonation = async ({ txId, adminId, comment }) => {
+    const response = await api.post(`/admin/donation-requests/${txId}/reject`, {
+        admin_id: adminId,
+        comment: comment
+    });
+    return response.data;
+};
+
 export default api;

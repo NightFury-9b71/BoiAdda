@@ -1,12 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bell, User, LogOut, Settings, BookOpen } from "lucide-react";
 import { useAuth } from '../../context/AuthContext.jsx';
 import { Link } from 'react-router-dom';
 import { colorClasses } from '../../styles/colors.js';
+import NotificationPanel from '../NotificationPanel.jsx';
+import api from '../../api.js';
 
 const Header = () => {
     const { user, logout, isAuthenticated } = useAuth();
     const [showUserMenu, setShowUserMenu] = useState(false);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    useEffect(() => {
+        if (isAuthenticated && user?.id) {
+            loadUnreadCount();
+        }
+    }, [isAuthenticated, user?.id]);
+
+    const loadUnreadCount = async () => {
+        try {
+            const notifications = await api.getNotifications(user.id);
+            const unread = notifications.filter(n => !n.read).length;
+            setUnreadCount(unread);
+        } catch (error) {
+            console.error('Error loading notification count:', error);
+        }
+    };
 
     const handleLogout = async () => {
         await logout();
@@ -21,18 +41,36 @@ const Header = () => {
 
             {isAuthenticated ? (
                 <div className="flex items-center gap-4">
-                    <button className={`p-2 hover:bg-gray-100 rounded-full transition-colors relative`}>
-                        <Bell className={`w-5 h-5 ${colorClasses.text.secondary}`} />
-                        {/* Notification badge */}
-                        <span className={`absolute -top-1 -right-1 bg-red-500 ${colorClasses.text.white} text-xs rounded-full w-4 h-4 flex items-center justify-center`}>
-                            3
-                        </span>
-                    </button>
+                    <div className="relative">
+                        <button 
+                            className={`p-2 hover:bg-gray-100 rounded-full transition-colors relative`}
+                            onClick={() => {
+                                setShowNotifications(!showNotifications);
+                                setShowUserMenu(false); // Close user menu when opening notifications
+                            }}
+                        >
+                            <Bell className={`w-5 h-5 ${colorClasses.text.secondary}`} />
+                            {/* Notification badge */}
+                            {unreadCount > 0 && (
+                                <span className={`absolute -top-1 -right-1 bg-red-500 ${colorClasses.text.white} text-xs rounded-full min-w-4 h-4 flex items-center justify-center px-1`}>
+                                    {unreadCount > 99 ? '99+' : unreadCount}
+                                </span>
+                            )}
+                        </button>
+
+                        <NotificationPanel 
+                            isOpen={showNotifications}
+                            onClose={() => setShowNotifications(false)}
+                        />
+                    </div>
 
                     <div className="relative">
                         <button 
                             className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-full transition-colors"
-                            onClick={() => setShowUserMenu(!showUserMenu)}
+                            onClick={() => {
+                                setShowUserMenu(!showUserMenu);
+                                setShowNotifications(false); // Close notifications when opening user menu
+                            }}
                         >
                             {user?.avatar ? (
                                 <img 

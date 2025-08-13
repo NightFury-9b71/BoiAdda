@@ -245,6 +245,10 @@ const api = {
 
   getLibraryStats: async () => {
     await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Get real recent activities from the backend
+    const recentActivitiesResponse = await apiClient.get('/recent-activities?limit=10');
+    
     return {
       total_books: 1247,
       borrowed_books: 423,
@@ -252,26 +256,18 @@ const api = {
       total_users: 345,
       active_users: 89,
       new_users: 12,
-      recent_activities: [
-        {
-          id: 1,
-          type: 'borrow',
-          description: 'John Doe borrowed "The Great Gatsby"',
-          timestamp: new Date().toISOString()
-        },
-        {
-          id: 2,
-          type: 'donation',
-          description: 'Jane Smith donated "1984"',
-          timestamp: new Date().toISOString()
-        }
-      ]
+      recent_activities: recentActivitiesResponse.data
     };
   },
 
   addBook: async (bookData) => {
     await new Promise(resolve => setTimeout(resolve, 1000));
     return { success: true };
+  },
+
+  getRecentActivities: async (limit = 10) => {
+    const response = await apiClient.get(`/recent-activities?limit=${limit}`);
+    return response.data;
   },
 };
 
