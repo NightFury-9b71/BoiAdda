@@ -44,6 +44,20 @@ const NotificationPanel = ({ isOpen, onClose }) => {
 
   const getNotificationIcon = (type) => {
     switch (type) {
+      case 'overdue':
+        return <Clock className="h-4 w-4 text-red-600" />;
+      case 'due_soon':
+        return <Clock className="h-4 w-4 text-orange-500" />;
+      case 'borrow_approved':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'borrow_rejected':
+        return <X className="h-4 w-4 text-red-500" />;
+      case 'donation_approved':
+        return <Gift className="h-4 w-4 text-green-500" />;
+      case 'donation_rejected':
+        return <Gift className="h-4 w-4 text-red-500" />;
+      case 'welcome':
+        return <CheckCircle className="h-4 w-4 text-blue-500" />;
       case 'due_date':
         return <Clock className="h-4 w-4 text-orange-500" />;
       case 'request_approved':
@@ -56,6 +70,44 @@ const NotificationPanel = ({ isOpen, onClose }) => {
         return <BookOpen className="h-4 w-4 text-blue-500" />;
       default:
         return <Bell className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const getNotificationPriority = (type) => {
+    switch (type) {
+      case 'overdue':
+        return 'high'; // Red background
+      case 'due_soon':
+        return 'medium'; // Orange background
+      case 'borrow_approved':
+      case 'donation_approved':
+        return 'success'; // Green background
+      case 'borrow_rejected':
+      case 'donation_rejected':
+        return 'error'; // Red background
+      case 'welcome':
+        return 'info'; // Blue background
+      default:
+        return 'normal'; // Default background
+    }
+  };
+
+  const getPriorityStyles = (priority, isRead) => {
+    if (isRead) return 'hover:bg-gray-50';
+    
+    switch (priority) {
+      case 'high':
+        return 'bg-red-50 border-l-4 border-red-500 hover:bg-red-100';
+      case 'medium':
+        return 'bg-orange-50 border-l-4 border-orange-500 hover:bg-orange-100';
+      case 'success':
+        return 'bg-green-50 border-l-4 border-green-500 hover:bg-green-100';
+      case 'error':
+        return 'bg-red-50 border-l-4 border-red-500 hover:bg-red-100';
+      case 'info':
+        return 'bg-blue-50 border-l-4 border-blue-500 hover:bg-blue-100';
+      default:
+        return 'bg-blue-50 hover:bg-blue-100';
     }
   };
 
@@ -113,39 +165,42 @@ const NotificationPanel = ({ isOpen, onClose }) => {
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
-              {notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`p-4 hover:bg-gray-50 transition-colors ${
-                    !notification.read ? 'bg-blue-50' : ''
-                  }`}
-                >
-                  <div className="flex items-start space-x-3">
-                    <div className="flex-shrink-0 mt-1">
-                      {getNotificationIcon(notification.type)}
+              {notifications.map((notification) => {
+                const priority = getNotificationPriority(notification.type);
+                const priorityStyles = getPriorityStyles(priority, notification.read);
+                
+                return (
+                  <div
+                    key={notification.id}
+                    className={`p-4 transition-colors ${priorityStyles}`}
+                  >
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 mt-1">
+                        {getNotificationIcon(notification.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm ${colorClasses.text.primary} ${
+                          !notification.read ? 'font-medium' : ''
+                        }`}>
+                          {notification.message}
+                        </p>
+                        <p className={`text-xs ${colorClasses.text.tertiary} mt-1`}>
+                          {formatTimestamp(notification.timestamp)}
+                        </p>
+                      </div>
+                      {!notification.read && (
+                        <button
+                          onClick={() => markAsRead(notification.id)}
+                          className={`flex-shrink-0 p-1 rounded-full hover:bg-blue-100 ${colorClasses.text.accent}`}
+                          title="পঠিত হিসেবে চিহ্নিত করুন"
+                        >
+                          <Check className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm ${colorClasses.text.primary} ${
-                        !notification.read ? 'font-medium' : ''
-                      }`}>
-                        {notification.message}
-                      </p>
-                      <p className={`text-xs ${colorClasses.text.tertiary} mt-1`}>
-                        {formatTimestamp(notification.timestamp)}
-                      </p>
-                    </div>
-                    {!notification.read && (
-                      <button
-                        onClick={() => markAsRead(notification.id)}
-                        className={`flex-shrink-0 p-1 rounded-full hover:bg-blue-100 ${colorClasses.text.accent}`}
-                        title="পঠিত হিসেবে চিহ্নিত করুন"
-                      >
-                        <Check className="h-3 w-3" />
-                      </button>
-                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

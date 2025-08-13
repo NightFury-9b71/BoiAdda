@@ -2,6 +2,7 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 import logging
 import time
+import uuid
 
 from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -1619,38 +1620,201 @@ class Notification(BaseModel):
 
 @app.get("/users/{user_id}/notifications", response_model=List[Notification], tags=["public"])
 def get_user_notifications(user_id: int, db: Session = Depends(get_db)):
-    """Get notifications for a specific user (mock data for now)"""
+    """Get real notifications for a specific user based on their activity"""
     # Check if user exists
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(404, detail="User not found.")
     
-    # Return mock notifications for now
-    # In a real implementation, you would query a notifications table
-    mock_notifications = [
-        Notification(
-            id=1,
-            type="due_date",
-            message="আপনার ধার নেওয়া বই 'The Great Gatsby' আগামীকাল ফেরত দিতে হবে",
-            timestamp="2025-08-12T10:00:00",
-            read=False
-        ),
-        Notification(
-            id=2,
-            type="request_approved",
-            message="আপনার দান করার অনুরোধ 'Pride and Prejudice' অনুমোদিত হয়েছে",
-            timestamp="2025-08-11T15:30:00",
-            read=True
-        )
-    ]
+    notifications = []
+    notification_id = 1
     
-    return mock_notifications
+    # 1. Check for overdue books (due date reminders)
+    overdue_books = db.exec(
+        select(BorrowTransaction, BookCopy, Book).join(
+            BookCopy, BorrowTransaction.book_copy_id == BookCopy.id
+        ).join(
+            Book, BookCopy.book_id == Book.id
+        ).where(
+            (BorrowTransaction.user_id == user_id) &
+            (BorrowTransaction.status == TransactionStatus.SUCCESS) &
+            (BorrowTransaction.return_date.is_(None)) &
+            (BorrowTransaction.due_date < datetime.now())
+        )
+    ).all()
+    
+    for txn, copy, book in overdue_books:
+        days_overdue = (datetime.now() - txn.due_date).days
+        notifications.append(Notification(
+            id=notification_id,
+            type="overdue",
+            message=f"আপনার ধার নেওয়া বই '{book.title}' {days_overdue} দিন মেয়াদোত্তীর্ণ হয়ে গেছে। অনুগ্রহ করে তাড়াতাড়ি ফেরত দিন।",
+            timestamp=txn.due_date.isoformat(),
+            read=is_notification_read(user_id, notification_id)
+        ))
+        notification_id += 1
+    
+    # 2. Check for books due soon (within 2 days)
+    due_soon_books = db.exec(
+        select(BorrowTransaction, BookCopy, Book).join(
+            BookCopy, BorrowTransaction.book_copy_id == BookCopy.id
+        ).join(
+            Book, BookCopy.book_id == Book.id
+        ).where(
+            (BorrowTransaction.user_id == user_id) &
+            (BorrowTransaction.status == TransactionStatus.SUCCESS) &
+            (BorrowTransaction.return_date.is_(None)) &
+            (BorrowTransaction.due_date >= datetime.now()) &
+            (BorrowTransaction.due_date <= datetime.now() + timedelta(days=2))
+        )
+    ).all()
+    
+    for txn, copy, book in due_soon_books:
+        days_left = (txn.due_date - datetime.now()).days
+        if days_left == 0:
+            message = f"আপনার ধার নেওয়া বই '{book.title}' আজকে ফেরত দিতে হবে।"
+        elif days_left == 1:
+            message = f"আপনার ধার নেওয়া বই '{book.title}' আগামীকাল ফেরত দিতে হবে।"
+        else:
+            message = f"আপনার ধার নেওয়া বই '{book.title}' {days_left} দিনের মধ্যে ফেরত দিতে হবে।"
+        
+        notifications.append(Notification(
+            id=notification_id,
+            type="due_soon",
+            message=message,
+            timestamp=txn.due_date.isoformat(),
+            read=is_notification_read(user_id, notification_id)
+        ))
+        notification_id += 1
+    
+    # 3. Recent approved borrow requests (last 7 days)
+    recent_approved_borrows = db.exec(
+        select(BorrowTransaction, BookCopy, Book).join(
+            BookCopy, BorrowTransaction.book_copy_id == BookCopy.id
+        ).join(
+            Book, BookCopy.book_id == Book.id
+        ).where(
+            (BorrowTransaction.user_id == user_id) &
+            (BorrowTransaction.status == TransactionStatus.SUCCESS) &
+            (BorrowTransaction.updated_at >= datetime.now() - timedelta(days=7))
+        ).order_by(BorrowTransaction.updated_at.desc())
+    ).all()
+    
+    for txn, copy, book in recent_approved_borrows:
+        notifications.append(Notification(
+            id=notification_id,
+            type="borrow_approved",
+            message=f"আপনার ধার নেওয়ার অনুরোধ '{book.title}' অনুমোদিত হয়েছে। বইটি সংগ্রহ করুন।",
+            timestamp=txn.updated_at.isoformat(),
+            read=is_notification_read(user_id, notification_id)
+        ))
+        notification_id += 1
+    
+    # 4. Recent rejected borrow requests (last 7 days)
+    recent_rejected_borrows = db.exec(
+        select(BorrowTransaction, BookCopy, Book).join(
+            BookCopy, BorrowTransaction.book_copy_id == BookCopy.id
+        ).join(
+            Book, BookCopy.book_id == Book.id
+        ).where(
+            (BorrowTransaction.user_id == user_id) &
+            (BorrowTransaction.status == TransactionStatus.FAILED) &
+            (BorrowTransaction.updated_at >= datetime.now() - timedelta(days=7))
+        ).order_by(BorrowTransaction.updated_at.desc())
+    ).all()
+    
+    for txn, copy, book in recent_rejected_borrows:
+        reason = f" কারণ: {txn.admin_comment}" if txn.admin_comment else ""
+        notifications.append(Notification(
+            id=notification_id,
+            type="borrow_rejected",
+            message=f"আপনার ধার নেওয়ার অনুরোধ '{book.title}' প্রত্যাখ্যান করা হয়েছে।{reason}",
+            timestamp=txn.updated_at.isoformat(),
+            read=is_notification_read(user_id, notification_id)
+        ))
+        notification_id += 1
+    
+    # 5. Recent approved donation requests (last 7 days)
+    recent_approved_donations = db.exec(
+        select(DonationTransaction, Book).join(
+            Book, DonationTransaction.book_id == Book.id
+        ).where(
+            (DonationTransaction.user_id == user_id) &
+            (DonationTransaction.status == TransactionStatus.SUCCESS) &
+            (DonationTransaction.updated_at >= datetime.now() - timedelta(days=7))
+        ).order_by(DonationTransaction.updated_at.desc())
+    ).all()
+    
+    for txn, book in recent_approved_donations:
+        notifications.append(Notification(
+            id=notification_id,
+            type="donation_approved",
+            message=f"আপনার দান করার অনুরোধ '{book.title}' অনুমোদিত হয়েছে। ধন্যবাদ!",
+            timestamp=txn.updated_at.isoformat(),
+            read=is_notification_read(user_id, notification_id)
+        ))
+        notification_id += 1
+    
+    # 6. Recent rejected donation requests (last 7 days)
+    recent_rejected_donations = db.exec(
+        select(DonationTransaction, Book).join(
+            Book, DonationTransaction.book_id == Book.id
+        ).where(
+            (DonationTransaction.user_id == user_id) &
+            (DonationTransaction.status == TransactionStatus.FAILED) &
+            (DonationTransaction.updated_at >= datetime.now() - timedelta(days=7))
+        ).order_by(DonationTransaction.updated_at.desc())
+    ).all()
+    
+    for txn, book in recent_rejected_donations:
+        reason = f" কারণ: {txn.admin_comment}" if txn.admin_comment else ""
+        notifications.append(Notification(
+            id=notification_id,
+            type="donation_rejected",
+            message=f"আপনার দান করার অনুরোধ '{book.title}' প্রত্যাখ্যান করা হয়েছে।{reason}",
+            timestamp=txn.updated_at.isoformat(),
+            read=is_notification_read(user_id, notification_id)
+        ))
+        notification_id += 1
+    
+    # 7. Welcome message for new users (joined within last 3 days)
+    if user.created_at >= datetime.now() - timedelta(days=3):
+        notifications.append(Notification(
+            id=notification_id,
+            type="welcome",
+            message=f"বইআড্ডায় স্বাগতম, {user.name}! আমাদের লাইব্রেরিতে বই ধার নিন এবং দান করুন।",
+            timestamp=user.created_at.isoformat(),
+            read=is_notification_read(user_id, notification_id)
+        ))
+        notification_id += 1
+    
+    # Sort by timestamp (newest first)
+    notifications.sort(key=lambda x: datetime.fromisoformat(x.timestamp), reverse=True)
+    
+    return notifications
+
+# ===== NOTIFICATION STORAGE (In-memory for now) =====
+notification_read_status = {}  # {user_id: set(notification_ids)}
+
+def mark_notification_read(user_id: int, notification_id: int):
+    """Mark a notification as read for a user"""
+    if user_id not in notification_read_status:
+        notification_read_status[user_id] = set()
+    notification_read_status[user_id].add(notification_id)
+
+def is_notification_read(user_id: int, notification_id: int) -> bool:
+    """Check if a notification is read by a user"""
+    return user_id in notification_read_status and notification_id in notification_read_status[user_id]
 
 @app.put("/notifications/{notification_id}/read", tags=["public"])
-def mark_notification_as_read(notification_id: int):
-    """Mark a notification as read (mock implementation)"""
-    # In a real implementation, you would update the notification in the database
-    return {"success": True, "message": "Notification marked as read"}
+def mark_notification_as_read(notification_id: int, current_user_id: int = Depends(get_current_user_id)):
+    """Mark a notification as read"""
+    try:
+        mark_notification_read(current_user_id, notification_id)
+        return {"success": True, "message": "Notification marked as read"}
+    except Exception as e:
+        logger.error(f"Error marking notification as read: {e}")
+        return {"success": False, "message": "Failed to mark notification as read"}
 
 # ===== UTILITY ROUTES =====
 
