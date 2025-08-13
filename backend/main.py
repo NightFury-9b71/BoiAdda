@@ -156,7 +156,7 @@ app.add_middleware(
 @app.get("/healthz", tags=["health"])
 def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "timestamp": datetime.utcnow()}
+    return {"status": "healthy", "timestamp": datetime.now()}
 
 @app.get("/readyz", tags=["health"])
 def readiness_check(db: Session = Depends(get_db)):
@@ -164,7 +164,7 @@ def readiness_check(db: Session = Depends(get_db)):
     try:
         # Test database connection
         db.exec(select(Role)).first()
-        return {"status": "ready", "timestamp": datetime.utcnow()}
+        return {"status": "ready", "timestamp": datetime.now()}
     except Exception as e:
         logger.error(f"Readiness check failed: {e}")
         raise HTTPException(status_code=503, detail="Service not ready")
@@ -493,7 +493,7 @@ def request_borrow(book_id: int, req: BorrowRequestInput, db: Session = Depends(
     txn = BorrowTransaction(
         book_copy_id=copy.id,
         user_id=req.user_id,
-        due_date=datetime.utcnow() + timedelta(days=14),
+        due_date=datetime.now() + timedelta(days=14),
         status=TransactionStatus.PENDING
     )
     db.add(txn)
@@ -591,7 +591,7 @@ def return_book(*, user_id: int = Query(...), book_copy_id: Optional[int] = Quer
             raise HTTPException(404, "No active borrowed book transaction found.")
     
     book_copy: BookCopy = db.get(BookCopy, txn.book_copy_id)
-    txn.return_date = datetime.utcnow()
+    txn.return_date = datetime.now()
     book_copy.status = BookStatus.AVAILABLE
     book_copy.current_holder_id = None
     db.add(txn)
@@ -630,7 +630,7 @@ def get_user_borrowed_books(user_id: int, db: Session = Depends(get_db)):
             "category": book.category,
             "borrowed_date": txn.created_at,
             "due_date": txn.due_date,
-            "is_overdue": datetime.utcnow() > txn.due_date
+            "is_overdue": datetime.now() > txn.due_date
         })
     
     return result
@@ -653,7 +653,7 @@ def get_user_recent_activities(user_id: int, limit: int = Query(10, le=50), days
     activities = []
     
     # Calculate the cutoff date
-    cutoff_date = datetime.utcnow() - timedelta(days=days)
+    cutoff_date = datetime.now() - timedelta(days=days)
     
     # Get recent borrow transactions for this user (both successful and pending)
     recent_borrows = db.exec(
@@ -987,7 +987,7 @@ def approve_borrow(tx_id: int, input: AdminActionInput, db: Session = Depends(ge
     tx.status = TransactionStatus.SUCCESS
     tx.admin_id = input.admin_id
     tx.admin_comment = input.comment
-    tx.updated_at = datetime.utcnow()
+    tx.updated_at = datetime.now()
     book_copy.status = BookStatus.BORROWED
     book_copy.current_holder_id = tx.user_id
     
@@ -1010,7 +1010,7 @@ def reject_borrow(tx_id: int, input: AdminActionInput, db: Session = Depends(get
     tx.status = TransactionStatus.FAILED
     tx.admin_id = input.admin_id
     tx.admin_comment = input.comment
-    tx.updated_at = datetime.utcnow()
+    tx.updated_at = datetime.now()
     db.add(tx)
     db.commit()
     return {"message": "Borrow request rejected."}
@@ -1029,7 +1029,7 @@ def approve_donation(tx_id: int, input: AdminActionInput, db: Session = Depends(
     tx.status = TransactionStatus.SUCCESS
     tx.admin_id = input.admin_id
     tx.admin_comment = input.comment
-    tx.updated_at = datetime.utcnow()
+    tx.updated_at = datetime.now()
     
     # Add new physical copy to library
     new_copy = BookCopy(book_id=tx.book_id, status=BookStatus.AVAILABLE)
@@ -1052,7 +1052,7 @@ def reject_donation(tx_id: int, input: AdminActionInput, db: Session = Depends(g
     tx.status = TransactionStatus.FAILED
     tx.admin_id = input.admin_id
     tx.admin_comment = input.comment
-    tx.updated_at = datetime.utcnow()
+    tx.updated_at = datetime.now()
     db.add(tx)
     db.commit()
     return {"message": "Donation rejected."}
@@ -1217,7 +1217,7 @@ def get_user_statistics(user_id: int, db: Session = Depends(get_db)):
         
         status = status_map[txn.status]
         is_current = txn.status == TransactionStatus.SUCCESS and txn.return_date is None
-        is_overdue = is_current and datetime.utcnow() > txn.due_date
+        is_overdue = is_current and datetime.now() > txn.due_date
         
         if txn.status == TransactionStatus.SUCCESS:
             successful_borrow += 1

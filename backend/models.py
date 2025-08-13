@@ -39,7 +39,7 @@ class User(SQLModel, table=True):
     password: str
     phone: Optional[str] = None
     role_id: Optional[int] = Field(default=None, foreign_key="role.id")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
 
     role: Optional[Role] = Relationship(back_populates="users")
     borrowed_books: List["BookCopy"] = Relationship(
@@ -88,10 +88,10 @@ class BorrowTransaction(SQLModel, table=True):
     book_copy_id: int = Field(foreign_key="book_copy.id")
     user_id: int = Field(foreign_key="user.id")
     admin_id: Optional[int] = Field(default=None, foreign_key="user.id")
-    due_date: datetime = Field(default_factory=lambda: datetime.utcnow() + timedelta(days=14))
+    due_date: datetime = Field(default_factory=lambda: datetime.now() + timedelta(days=14))
     return_date: Optional[datetime] = None
     admin_comment: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = None
     status: TransactionStatus = Field(default=TransactionStatus.PENDING)
 
@@ -111,7 +111,7 @@ class DonationTransaction(SQLModel, table=True):
     user_id: int = Field(foreign_key="user.id")
     admin_id: Optional[int] = Field(default=None, foreign_key="user.id")
     admin_comment: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = None
     status: TransactionStatus = Field(default=TransactionStatus.PENDING)
 
