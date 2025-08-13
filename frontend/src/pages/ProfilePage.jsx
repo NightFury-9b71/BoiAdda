@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   User, 
   Mail, 
@@ -9,15 +9,20 @@ import {
   Camera,
   Book,
   Gift,
-  Award
+  Award,
+  AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { PageHeader, Card, Button, Input, StatsCard, Badge } from '../components/ui/ThemeComponents.jsx';
 import { colorClasses } from '../styles/colors.js';
+import api from '../api.js';
 
 const ProfilePage = () => {
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [userStats, setUserStats] = useState(null);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -25,6 +30,28 @@ const ProfilePage = () => {
     address: user?.address || '',
     bio: user?.bio || ''
   });
+
+  useEffect(() => {
+    if (user?.id) {
+      loadUserData();
+    }
+  }, [user]);
+
+  const loadUserData = async () => {
+    setLoading(true);
+    try {
+      const [stats, activities] = await Promise.all([
+        api.getUserStatistics(user.id),
+        api.getUserRecentActivities(user.id, 5, 7)
+      ]);
+      setUserStats(stats);
+      setRecentActivities(activities);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -184,29 +211,62 @@ const ProfilePage = () => {
               সাম্প্রতিক কার্যকলাপ
             </h3>
             <div className="space-y-4">
-              <div className="flex items-start">
-                <div className={`p-2 rounded-full ${colorClasses.bg.success} mr-3 mt-1`}>
-                  <Book className={`h-4 w-4 ${colorClasses.text.success}`} />
+              {loading ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
                 </div>
-                <div className="flex-1">
-                  <p className={`text-sm font-medium ${colorClasses.text.primary}`}>
-                    "বাংলা সাহিত্যের ইতিহাস" বই ধার নিয়েছেন
-                  </p>
-                  <p className={`text-xs ${colorClasses.text.tertiary}`}>২ দিন আগে</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start">
-                <div className="p-2 rounded-full bg-purple-100 mr-3 mt-1">
-                  <Gift className="h-4 w-4 text-purple-600" />
-                </div>
-                <div className="flex-1">
-                  <p className={`text-sm font-medium ${colorClasses.text.primary}`}>
-                    "প্রোগ্রামিং বেসিক" বই দান করেছেন
-                  </p>
-                  <p className={`text-xs ${colorClasses.text.tertiary}`}>১ সপ্তাহ আগে</p>
-                </div>
-              </div>
+              ) : recentActivities.length === 0 ? (
+                <p className={`text-sm ${colorClasses.text.tertiary} text-center py-4`}>
+                  কোনো সাম্প্রতিক কার্যকলাপ নেই
+                </p>
+              ) : (
+                recentActivities.map((activity, index) => {
+                  const getActivityIcon = (type) => {
+                    switch (type) {
+                      case 'borrow':
+                      case 'borrow_request':
+                        return { icon: Book, bgColor: colorClasses.bg.success, textColor: colorClasses.text.success };
+                      case 'donation':
+                      case 'donation_request':
+                        return { icon: Gift, bgColor: 'bg-purple-100', textColor: 'text-purple-600' };
+                      case 'return':
+                        return { icon: Book, bgColor: 'bg-blue-100', textColor: 'text-blue-600' };
+                      default:
+                        return { icon: Book, bgColor: colorClasses.bg.primary, textColor: colorClasses.text.primary };
+                    }
+                  };
+
+                  const { icon: Icon, bgColor, textColor } = getActivityIcon(activity.type);
+                  const formatDate = (timestamp) => {
+                    const date = new Date(timestamp);
+                    const now = new Date();
+                    const diffTime = Math.abs(now - date);
+                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    if (diffDays === 0) return 'আজ';
+                    if (diffDays === 1) return '১ দিন আগে';
+                    if (diffDays < 7) return `${diffDays} দিন আগে`;
+                    if (diffDays < 30) return `${Math.floor(diffDays / 7)} সপ্তাহ আগে`;
+                    return `${Math.floor(diffDays / 30)} মাস আগে`;
+                  };
+
+                  return (
+                    <div key={activity.id || index} className="flex items-start">
+                      <div className={`p-2 rounded-full ${bgColor} mr-3 mt-1`}>
+                        <Icon className={`h-4 w-4 ${textColor}`} />
+                      </div>
+                      <div className="flex-1">
+                        <p className={`text-sm font-medium ${colorClasses.text.primary}`}>
+                          {activity.description}
+                        </p>
+                        <p className={`text-xs ${colorClasses.text.tertiary}`}>
+                          {formatDate(activity.timestamp)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </Card>
         </div>
@@ -219,18 +279,44 @@ const ProfilePage = () => {
               আমার পরিসংখ্যান
             </h3>
             <div className="space-y-4">
-              <StatsCard
-                value="১২"
-                label="ধার নেওয়া বই"
-                icon={Book}
-                color="blue"
-              />
-              <StatsCard
-                value="৮"
-                label="দান করা বই"
-                icon={Gift}
-                color="purple"
-              />
+              {loading ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+                </div>
+              ) : userStats ? (
+                <>
+                  <StatsCard
+                    value={userStats.total_borrowed.toString()}
+                    label="ধার নেওয়া বই"
+                    icon={Book}
+                    color="blue"
+                  />
+                  <StatsCard
+                    value={userStats.total_donated.toString()}
+                    label="দান করা বই"
+                    icon={Gift}
+                    color="purple"
+                  />
+                  <StatsCard
+                    value={userStats.current_borrowed.toString()}
+                    label="বর্তমানে ধারে আছে"
+                    icon={Book}
+                    color="green"
+                  />
+                  {userStats.overdue_books > 0 && (
+                    <StatsCard
+                      value={userStats.overdue_books.toString()}
+                      label="মেয়াদোত্তীর্ণ বই"
+                      icon={AlertCircle}
+                      color="red"
+                    />
+                  )}
+                </>
+              ) : (
+                <p className={`text-sm ${colorClasses.text.tertiary} text-center py-4`}>
+                  পরিসংখ্যান লোড করা যায়নি
+                </p>
+              )}
             </div>
           </Card>
 

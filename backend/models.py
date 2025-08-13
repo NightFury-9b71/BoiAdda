@@ -39,6 +39,7 @@ class User(SQLModel, table=True):
     password: str
     phone: Optional[str] = None
     role_id: Optional[int] = Field(default=None, foreign_key="role.id")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
     role: Optional[Role] = Relationship(back_populates="users")
     borrowed_books: List["BookCopy"] = Relationship(

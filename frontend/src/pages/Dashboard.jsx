@@ -21,14 +21,15 @@ const Dashboard = () => {
 
     useEffect(() => {
         loadDashboardData();
-    }, []);
+    }, [user]);
 
     const loadDashboardData = async () => {
         setLoading(true);
         try {
             const [libraryStats, activities] = await Promise.all([
                 api.getLibraryStats(),
-                api.getRecentActivities(10)
+                // Both admins and regular users see their personal activities
+                user ? api.getUserRecentActivities(user.id, 10, 7) : api.getRecentActivities(10)
             ]);
             setStats(libraryStats);
             setRecentActivities(activities);

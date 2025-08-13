@@ -33,20 +33,6 @@
 
 ### Production Deployment
 
-#### Option 1: Docker Compose (Recommended)
-
-1. **Build and run with PostgreSQL:**
-   ```bash
-   docker-compose up --build -d
-   ```
-
-2. **View logs:**
-   ```bash
-   docker-compose logs -f backend
-   ```
-
-#### Option 2: Manual Production Setup
-
 1. **Install production dependencies:**
    ```bash
    pip install -r requirements.txt

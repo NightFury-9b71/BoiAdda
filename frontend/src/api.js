@@ -151,28 +151,39 @@ const api = {
   },
 
   getNotifications: async (userId) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return [
-      {
-        id: 1,
-        type: "due_date",
-        message: "Your book 'The Great Gatsby' is due tomorrow",
-        timestamp: "2025-07-31T10:00:00",
-        read: false
-      },
-      {
-        id: 2,
-        type: "request_approved",
-        message: "Your donation request for 'Pride and Prejudice' has been approved",
-        timestamp: "2025-06-02T15:30:00",
-        read: true
-      }
-    ];
+    try {
+      const response = await apiClient.get(`/users/${userId}/notifications`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      // Return mock notifications as fallback
+      return [
+        {
+          id: 1,
+          type: "due_date",
+          message: "আপনার ধার নেওয়া বই 'The Great Gatsby' আগামীকাল ফেরত দিতে হবে",
+          timestamp: "2025-08-12T10:00:00",
+          read: false
+        },
+        {
+          id: 2,
+          type: "request_approved",
+          message: "আপনার দান করার অনুরোধ 'Pride and Prejudice' অনুমোদিত হয়েছে",
+          timestamp: "2025-08-11T15:30:00",
+          read: true
+        }
+      ];
+    }
   },
 
   markNotificationAsRead: async (notificationId) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { success: true };
+    try {
+      const response = await apiClient.put(`/notifications/${notificationId}/read`);
+      return response.data;
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      return { success: false };
+    }
   },
 
   getUserProfile: async (userId) => {
@@ -267,6 +278,11 @@ const api = {
 
   getRecentActivities: async (limit = 10) => {
     const response = await apiClient.get(`/recent-activities?limit=${limit}`);
+    return response.data;
+  },
+
+  getUserRecentActivities: async (userId, limit = 10, days = 7) => {
+    const response = await apiClient.get(`/users/${userId}/recent-activities?limit=${limit}&days=${days}`);
     return response.data;
   },
 };

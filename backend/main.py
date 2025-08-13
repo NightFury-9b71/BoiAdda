@@ -237,6 +237,14 @@ class AuthUser(BaseModel):
     role_name: str
     created_at: datetime
 
+class RecentActivity(BaseModel):
+    id: str
+    type: str  # 'borrow', 'donation', 'return', 'member'
+    description: str
+    timestamp: datetime
+    user_name: Optional[str] = None
+    book_title: Optional[str] = None
+
 # ===== AUTHENTICATION ROUTES =====
 
 @app.post("/auth/register", response_model=AuthResponse, tags=["auth"])
@@ -627,6 +635,205 @@ def get_user_borrowed_books(user_id: int, db: Session = Depends(get_db)):
     
     return result
 
+# NEW ROUTE: Get user's recent activities
+@app.get("/users/{user_id}/recent-activities", response_model=List[RecentActivity], tags=["public"])
+def get_user_recent_activities(user_id: int, limit: int = Query(10, le=50), days: int = Query(7, le=30), db: Session = Depends(get_db)):
+    """Get recent activities for a specific user from the past X days"""
+    # Check if user exists and load role relationship
+    user_with_role = db.exec(
+        select(User, Role).join(Role, User.role_id == Role.id, isouter=True).where(User.id == user_id)
+    ).first()
+    
+    if not user_with_role:
+        raise HTTPException(404, detail="User not found.")
+    
+    user, role = user_with_role
+    user.role = role  # Manually set the role relationship
+    
+    activities = []
+    
+    # Calculate the cutoff date
+    cutoff_date = datetime.utcnow() - timedelta(days=days)
+    
+    # Get recent borrow transactions for this user (both successful and pending)
+    recent_borrows = db.exec(
+        select(BorrowTransaction, BookCopy, Book).join(
+            BookCopy, BorrowTransaction.book_copy_id == BookCopy.id
+        ).join(
+            Book, BookCopy.book_id == Book.id
+        ).where(
+            (BorrowTransaction.user_id == user_id) &
+            ((BorrowTransaction.created_at >= cutoff_date) |
+             (BorrowTransaction.updated_at >= cutoff_date))
+        ).order_by(BorrowTransaction.created_at.desc()).limit(limit)
+    ).all()
+    
+    for txn, copy, book in recent_borrows:
+        if txn.status == TransactionStatus.SUCCESS:
+            activities.append(RecentActivity(
+                id=f"borrow_{txn.id}",
+                type="borrow",
+                description=f"আপনি ধার নিয়েছেন \"{book.title}\"",
+                timestamp=txn.updated_at or txn.created_at,
+                user_name=user.name,
+                book_title=book.title
+            ))
+        elif txn.status == TransactionStatus.PENDING:
+            activities.append(RecentActivity(
+                id=f"borrow_request_{txn.id}",
+                type="borrow_request",
+                description=f"আপনি ধার নেওয়ার অনুরোধ করেছেন \"{book.title}\"",
+                timestamp=txn.created_at,
+                user_name=user.name,
+                book_title=book.title
+            ))
+        elif txn.status == TransactionStatus.FAILED:
+            activities.append(RecentActivity(
+                id=f"borrow_rejected_{txn.id}",
+                type="borrow_rejected",
+                description=f"আপনার ধার নেওয়ার অনুরোধ প্রত্যাখ্যান করা হয়েছে \"{book.title}\"",
+                timestamp=txn.updated_at or txn.created_at,
+                user_name=user.name,
+                book_title=book.title
+            ))
+    
+    # Get recent donation transactions for this user (both successful and pending)
+    recent_donations = db.exec(
+        select(DonationTransaction, Book).join(
+            Book, DonationTransaction.book_id == Book.id
+        ).where(
+            (DonationTransaction.user_id == user_id) &
+            ((DonationTransaction.created_at >= cutoff_date) |
+             (DonationTransaction.updated_at >= cutoff_date))
+        ).order_by(DonationTransaction.created_at.desc()).limit(limit)
+    ).all()
+    
+    for txn, book in recent_donations:
+        if txn.status == TransactionStatus.SUCCESS:
+            activities.append(RecentActivity(
+                id=f"donation_{txn.id}",
+                type="donation",
+                description=f"আপনি দান করেছেন \"{book.title}\"",
+                timestamp=txn.updated_at or txn.created_at,
+                user_name=user.name,
+                book_title=book.title
+            ))
+        elif txn.status == TransactionStatus.PENDING:
+            activities.append(RecentActivity(
+                id=f"donation_request_{txn.id}",
+                type="donation_request",
+                description=f"আপনি দান করার অনুরোধ করেছেন \"{book.title}\"",
+                timestamp=txn.created_at,
+                user_name=user.name,
+                book_title=book.title
+            ))
+        elif txn.status == TransactionStatus.FAILED:
+            activities.append(RecentActivity(
+                id=f"donation_rejected_{txn.id}",
+                type="donation_rejected",
+                description=f"আপনার দান করার অনুরোধ প্রত্যাখ্যান করা হয়েছে \"{book.title}\"",
+                timestamp=txn.updated_at or txn.created_at,
+                user_name=user.name,
+                book_title=book.title
+            ))
+    
+    # Get recent returns for this user (transactions with return_date in the past X days)
+    recent_returns = db.exec(
+        select(BorrowTransaction, BookCopy, Book).join(
+            BookCopy, BorrowTransaction.book_copy_id == BookCopy.id
+        ).join(
+            Book, BookCopy.book_id == Book.id
+        ).where(
+            (BorrowTransaction.user_id == user_id) &
+            (BorrowTransaction.return_date.isnot(None)) &
+            (BorrowTransaction.return_date >= cutoff_date)
+        ).order_by(BorrowTransaction.return_date.desc()).limit(limit)
+    ).all()
+    
+    for txn, copy, book in recent_returns:
+        activities.append(RecentActivity(
+            id=f"return_{txn.id}",
+            type="return", 
+            description=f"আপনি ফেরত দিয়েছেন \"{book.title}\"",
+            timestamp=txn.return_date,
+            user_name=user.name,
+            book_title=book.title
+        ))
+    
+    # Get admin activities if the user is an admin (transactions where this user was the admin)
+    if user.role and user.role.role_name == RoleType.ADMIN:
+        # Get recent borrow approvals/rejections
+        admin_borrow_actions = db.exec(
+            select(BorrowTransaction, User, BookCopy, Book).join(
+                User, BorrowTransaction.user_id == User.id
+            ).join(
+                BookCopy, BorrowTransaction.book_copy_id == BookCopy.id
+            ).join(
+                Book, BookCopy.book_id == Book.id
+            ).where(
+                (BorrowTransaction.admin_id == user_id) &
+                (BorrowTransaction.status.in_([TransactionStatus.SUCCESS, TransactionStatus.FAILED])) &
+                ((BorrowTransaction.updated_at >= cutoff_date))
+            ).order_by(BorrowTransaction.updated_at.desc()).limit(limit)
+        ).all()
+        
+        for txn, borrower, copy, book in admin_borrow_actions:
+            if txn.status == TransactionStatus.SUCCESS:
+                activities.append(RecentActivity(
+                    id=f"admin_approve_borrow_{txn.id}",
+                    type="admin_approve",
+                    description=f"আপনি অনুমোদন করেছেন {borrower.name} এর ধার নেওয়ার অনুরোধ \"{book.title}\"",
+                    timestamp=txn.updated_at,
+                    user_name=borrower.name,
+                    book_title=book.title
+                ))
+            elif txn.status == TransactionStatus.FAILED:
+                activities.append(RecentActivity(
+                    id=f"admin_reject_borrow_{txn.id}",
+                    type="admin_reject",
+                    description=f"আপনি প্রত্যাখ্যান করেছেন {borrower.name} এর ধার নেওয়ার অনুরোধ \"{book.title}\"",
+                    timestamp=txn.updated_at,
+                    user_name=borrower.name,
+                    book_title=book.title
+                ))
+        
+        # Get recent donation approvals/rejections
+        admin_donation_actions = db.exec(
+            select(DonationTransaction, User, Book).join(
+                User, DonationTransaction.user_id == User.id
+            ).join(
+                Book, DonationTransaction.book_id == Book.id
+            ).where(
+                (DonationTransaction.admin_id == user_id) &
+                (DonationTransaction.status.in_([TransactionStatus.SUCCESS, TransactionStatus.FAILED])) &
+                ((DonationTransaction.updated_at >= cutoff_date))
+            ).order_by(DonationTransaction.updated_at.desc()).limit(limit)
+        ).all()
+        
+        for txn, donor, book in admin_donation_actions:
+            if txn.status == TransactionStatus.SUCCESS:
+                activities.append(RecentActivity(
+                    id=f"admin_approve_donation_{txn.id}",
+                    type="admin_approve",
+                    description=f"আপনি অনুমোদন করেছেন {donor.name} এর দান করার অনুরোধ \"{book.title}\"",
+                    timestamp=txn.updated_at,
+                    user_name=donor.name,
+                    book_title=book.title
+                ))
+            elif txn.status == TransactionStatus.FAILED:
+                activities.append(RecentActivity(
+                    id=f"admin_reject_donation_{txn.id}",
+                    type="admin_reject",
+                    description=f"আপনি প্রত্যাখ্যান করেছেন {donor.name} এর দান করার অনুরোধ \"{book.title}\"",
+                    timestamp=txn.updated_at,
+                    user_name=donor.name,
+                    book_title=book.title
+                ))
+
+    # Sort all activities by timestamp and return limited results
+    activities.sort(key=lambda x: x.timestamp, reverse=True)
+    return activities[:limit]
+
 # ========== ADMIN ROUTES ==========
 
 # Response models for admin endpoints
@@ -849,14 +1056,6 @@ def reject_donation(tx_id: int, input: AdminActionInput, db: Session = Depends(g
     db.add(tx)
     db.commit()
     return {"message": "Donation rejected."}
-
-class RecentActivity(BaseModel):
-    id: str
-    type: str  # 'borrow', 'donation', 'return', 'member'
-    description: str
-    timestamp: datetime
-    user_name: Optional[str] = None
-    book_title: Optional[str] = None
 
 @app.get("/recent-activities", response_model=List[RecentActivity], tags=["public"])
 def get_recent_activities(limit: int = Query(10, le=50), db: Session = Depends(get_db)):
@@ -1102,6 +1301,50 @@ def get_user_statistics(user_id: int, db: Session = Depends(get_db)):
         rejected_borrow_requests=rejected_borrow,
         rejected_donation_requests=rejected_donation
     )
+
+# ===== NOTIFICATION ROUTES =====
+
+class Notification(BaseModel):
+    id: int
+    type: str
+    message: str
+    timestamp: str
+    read: bool
+
+@app.get("/users/{user_id}/notifications", response_model=List[Notification], tags=["public"])
+def get_user_notifications(user_id: int, db: Session = Depends(get_db)):
+    """Get notifications for a specific user (mock data for now)"""
+    # Check if user exists
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(404, detail="User not found.")
+    
+    # Return mock notifications for now
+    # In a real implementation, you would query a notifications table
+    mock_notifications = [
+        Notification(
+            id=1,
+            type="due_date",
+            message="আপনার ধার নেওয়া বই 'The Great Gatsby' আগামীকাল ফেরত দিতে হবে",
+            timestamp="2025-08-12T10:00:00",
+            read=False
+        ),
+        Notification(
+            id=2,
+            type="request_approved",
+            message="আপনার দান করার অনুরোধ 'Pride and Prejudice' অনুমোদিত হয়েছে",
+            timestamp="2025-08-11T15:30:00",
+            read=True
+        )
+    ]
+    
+    return mock_notifications
+
+@app.put("/notifications/{notification_id}/read", tags=["public"])
+def mark_notification_as_read(notification_id: int):
+    """Mark a notification as read (mock implementation)"""
+    # In a real implementation, you would update the notification in the database
+    return {"success": True, "message": "Notification marked as read"}
 
 # ===== UTILITY ROUTES =====
 
