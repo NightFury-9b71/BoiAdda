@@ -880,7 +880,7 @@ function UserManagementView({ theme }) {
 function AnalyticsView({ theme }) {
   const { data: stats = {}, isLoading } = useQuery({
     queryKey: ['analytics'],
-    queryFn: () => api.getLibraryStats(),
+    queryFn: () => api.getLibraryStatistics(),
   });
 
   if (isLoading) {

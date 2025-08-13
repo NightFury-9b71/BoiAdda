@@ -6,7 +6,7 @@ import time
 from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlmodel import SQLModel, Session, create_engine, select
+from sqlmodel import SQLModel, Session, create_engine, select, func
 from pydantic import BaseModel
 
 from models import *
@@ -1146,6 +1146,312 @@ def get_recent_activities(limit: int = Query(10, le=50), db: Session = Depends(g
     # Sort all activities by timestamp and return limited results
     activities.sort(key=lambda x: x.timestamp, reverse=True)
     return activities[:limit]
+
+@app.get("/library/statistics", tags=["public"])
+async def get_library_statistics(db: Session = Depends(get_db)):
+    """Get overall library statistics"""
+    try:
+        # Get total books
+        total_books = db.exec(select(func.count(Book.id))).first()
+        
+        # Get total book copies and available copies  
+        total_copies = db.exec(select(func.count(BookCopy.id))).first() or 0
+        available_copies = db.exec(
+            select(func.count(BookCopy.id))
+            .where(BookCopy.status == BookStatus.AVAILABLE)
+        ).first() or 0
+        borrowed_books = db.exec(
+            select(func.count(BookCopy.id))
+            .where(BookCopy.status == BookStatus.BORROWED)
+        ).first() or 0
+        
+        # Get total users
+        total_users = db.exec(select(func.count(User.id))).first()
+        
+        # Get active users (users with current borrows)
+        active_users = db.exec(
+            select(func.count(func.distinct(BorrowTransaction.user_id)))
+            .where(
+                (BorrowTransaction.return_date.is_(None)) &
+                (BorrowTransaction.status == TransactionStatus.SUCCESS)
+            )
+        ).first()
+        
+        # Get new users (last 7 days)
+        week_ago = datetime.now() - timedelta(days=7)
+        new_users = db.exec(
+            select(func.count(User.id))
+            .where(User.created_at > week_ago)
+        ).first()
+        
+        # Get total approved donations
+        total_donations = db.exec(
+            select(func.count(DonationTransaction.id))
+            .where(DonationTransaction.status == TransactionStatus.SUCCESS)
+        ).first()
+        
+        return {
+            "total_books": total_books or 0,
+            "available_books": available_copies,
+            "borrowed_books": borrowed_books,
+            "total_users": total_users or 0,
+            "active_users": active_users or 0,
+            "new_users": new_users or 0,
+            "total_donations": total_donations or 0
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching library statistics: {e}")
+        return {
+            "total_books": 0,
+            "available_books": 0,
+            "borrowed_books": 0,
+            "total_users": 0,
+            "active_users": 0,
+            "new_users": 0,
+            "total_donations": 0
+        }
+
+@app.get("/admin/books/detailed", tags=["admin"])
+async def get_detailed_books(db: Session = Depends(get_db)):
+    """Get detailed book information for admin statistics"""
+    try:
+        books = db.exec(
+            select(Book, User).outerjoin(User, Book.donor_id == User.id)
+        ).all()
+        
+        result = []
+        for book, donor in books:
+            # Get copies information
+            total_copies = db.exec(
+                select(func.count(BookCopy.id)).where(BookCopy.book_id == book.id)
+            ).first() or 0
+            
+            available_copies = db.exec(
+                select(func.count(BookCopy.id)).where(
+                    (BookCopy.book_id == book.id) & 
+                    (BookCopy.status == BookStatus.AVAILABLE)
+                )
+            ).first() or 0
+            
+            borrowed_copies = db.exec(
+                select(func.count(BookCopy.id)).where(
+                    (BookCopy.book_id == book.id) & 
+                    (BookCopy.status == BookStatus.BORROWED)
+                )
+            ).first() or 0
+            
+            result.append({
+                "id": book.id,
+                "title": book.title,
+                "author": book.author,
+                "category": book.category,
+                "isbn": book.isbn,
+                "description": book.description,
+                "cover_img": book.cover_img,
+                "donor_name": donor.name if donor else "Unknown",
+                "total_copies": total_copies,
+                "available_copies": available_copies,
+                "borrowed_copies": borrowed_copies
+            })
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching detailed books: {e}")
+        return []
+
+@app.get("/admin/users/detailed", tags=["admin"])
+async def get_detailed_users(db: Session = Depends(get_db)):
+    """Get detailed user information for admin statistics"""
+    try:
+        users = db.exec(
+            select(User, Role).join(Role, User.role_id == Role.id)
+        ).all()
+        
+        result = []
+        week_ago = datetime.now() - timedelta(days=7)
+        
+        for user, role in users:
+            # Get user's borrow count
+            total_borrowed = db.exec(
+                select(func.count(BorrowTransaction.id)).where(
+                    (BorrowTransaction.user_id == user.id) &
+                    (BorrowTransaction.status == TransactionStatus.SUCCESS)
+                )
+            ).first() or 0
+            
+            # Get user's current borrows
+            current_borrowed = db.exec(
+                select(func.count(BorrowTransaction.id)).where(
+                    (BorrowTransaction.user_id == user.id) &
+                    (BorrowTransaction.status == TransactionStatus.SUCCESS) &
+                    (BorrowTransaction.return_date.is_(None))
+                )
+            ).first() or 0
+            
+            # Get user's donations
+            total_donated = db.exec(
+                select(func.count(DonationTransaction.id)).where(
+                    (DonationTransaction.user_id == user.id) &
+                    (DonationTransaction.status == TransactionStatus.SUCCESS)
+                )
+            ).first() or 0
+            
+            is_new = user.created_at > week_ago
+            is_active = current_borrowed > 0
+            
+            result.append({
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "phone": user.phone,
+                "role_name": role.role_name.value,
+                "created_at": user.created_at,
+                "total_borrowed": total_borrowed,
+                "current_borrowed": current_borrowed,
+                "total_donated": total_donated,
+                "is_new": is_new,
+                "is_active": is_active
+            })
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching detailed users: {e}")
+        return []
+
+@app.get("/admin/borrowed-books/detailed", tags=["admin"])
+async def get_detailed_borrowed_books(db: Session = Depends(get_db)):
+    """Get detailed information about currently borrowed books"""
+    try:
+        borrowed_books = db.exec(
+            select(BorrowTransaction, BookCopy, Book, User).join(
+                BookCopy, BorrowTransaction.book_copy_id == BookCopy.id
+            ).join(
+                Book, BookCopy.book_id == Book.id
+            ).join(
+                User, BorrowTransaction.user_id == User.id
+            ).where(
+                (BorrowTransaction.status == TransactionStatus.SUCCESS) &
+                (BorrowTransaction.return_date.is_(None))
+            ).order_by(BorrowTransaction.created_at.desc())
+        ).all()
+        
+        result = []
+        for txn, copy, book, user in borrowed_books:
+            is_overdue = datetime.now() > txn.due_date
+            days_borrowed = (datetime.now() - txn.created_at).days
+            days_until_due = (txn.due_date - datetime.now()).days if not is_overdue else 0
+            
+            result.append({
+                "transaction_id": txn.id,
+                "book_copy_id": copy.id,
+                "book_title": book.title,
+                "book_author": book.author,
+                "book_category": book.category,
+                "user_name": user.name,
+                "user_email": user.email,
+                "borrowed_date": txn.created_at,
+                "due_date": txn.due_date,
+                "days_borrowed": days_borrowed,
+                "days_until_due": days_until_due,
+                "is_overdue": is_overdue
+            })
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching detailed borrowed books: {e}")
+        return []
+
+@app.get("/admin/donations/detailed", tags=["admin"])
+async def get_detailed_donations(db: Session = Depends(get_db)):
+    """Get detailed information about donations"""
+    try:
+        donations = db.exec(
+            select(DonationTransaction, Book, User).join(
+                Book, DonationTransaction.book_id == Book.id
+            ).join(
+                User, DonationTransaction.user_id == User.id
+            ).where(
+                DonationTransaction.status == TransactionStatus.SUCCESS
+            ).order_by(DonationTransaction.updated_at.desc())
+        ).all()
+        
+        result = []
+        for txn, book, user in donations:
+            # Count copies added for this book
+            copies_count = db.exec(
+                select(func.count(BookCopy.id)).where(BookCopy.book_id == book.id)
+            ).first() or 0
+            
+            result.append({
+                "transaction_id": txn.id,
+                "book_title": book.title,
+                "book_author": book.author,
+                "book_category": book.category,
+                "book_isbn": book.isbn,
+                "donor_name": user.name,
+                "donor_email": user.email,
+                "donation_date": txn.updated_at or txn.created_at,
+                "copies_added": copies_count,
+                "admin_comment": txn.admin_comment
+            })
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching detailed donations: {e}")
+        return []
+
+@app.get("/admin/available-books/detailed", tags=["admin"])
+async def get_detailed_available_books(db: Session = Depends(get_db)):
+    """Get detailed information about available books"""
+    try:
+        # Get all books with their available copies
+        books = db.exec(
+            select(Book, User).outerjoin(User, Book.donor_id == User.id)
+        ).all()
+        
+        result = []
+        for book, donor in books:
+            # Get available copies for this book
+            available_copies = db.exec(
+                select(BookCopy).where(
+                    (BookCopy.book_id == book.id) & 
+                    (BookCopy.status == BookStatus.AVAILABLE)
+                )
+            ).all()
+            
+            # Only include books that have available copies
+            if len(available_copies) > 0:
+                total_copies = db.exec(
+                    select(func.count(BookCopy.id)).where(BookCopy.book_id == book.id)
+                ).first() or 0
+                
+                borrowed_copies = db.exec(
+                    select(func.count(BookCopy.id)).where(
+                        (BookCopy.book_id == book.id) & 
+                        (BookCopy.status == BookStatus.BORROWED)
+                    )
+                ).first() or 0
+                
+                result.append({
+                    "id": book.id,
+                    "title": book.title,
+                    "author": book.author,
+                    "category": book.category,
+                    "isbn": book.isbn,
+                    "description": book.description,
+                    "cover_img": book.cover_img,
+                    "donor_name": donor.name if donor else "Unknown",
+                    "total_copies": total_copies,
+                    "available_copies": len(available_copies),
+                    "borrowed_copies": borrowed_copies,
+                    "available_copy_ids": [copy.id for copy in available_copies]
+                })
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching detailed available books: {e}")
+        return []
 
 class UserBorrowedBook(BaseModel):
     id: int

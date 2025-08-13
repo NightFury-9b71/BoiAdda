@@ -5,17 +5,15 @@ import {
   Gift, 
   Users, 
   TrendingUp,
-  Book,
   User
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { PageHeader, Card, StatsCard, LoadingSpinner } from '../components/ui/ThemeComponents.jsx';
+import { PageHeader, Card, LoadingSpinner } from '../components/ui/ThemeComponents.jsx';
 import { colorClasses } from '../styles/colors.js';
 import api from '../api.js';
 
 const Dashboard = () => {
     const { user } = useAuth();
-    const [stats, setStats] = useState(null);
     const [recentActivities, setRecentActivities] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -26,23 +24,14 @@ const Dashboard = () => {
     const loadDashboardData = async () => {
         setLoading(true);
         try {
-            const [libraryStats, activities] = await Promise.all([
-                api.getLibraryStats(),
-                // Both admins and regular users see their personal activities
-                user ? api.getUserRecentActivities(user.id, 10, 7) : api.getRecentActivities(10)
-            ]);
-            setStats(libraryStats);
+            // Load user's recent activities
+            const activities = user ? 
+                await api.getUserRecentActivities(user.id, 10, 7) : 
+                await api.getRecentActivities(10);
             setRecentActivities(activities);
         } catch (error) {
             console.error('Error loading dashboard data:', error);
-            // Fallback to stats activities if dedicated endpoint fails
-            try {
-                const libraryStats = await api.getLibraryStats();
-                setStats(libraryStats);
-                setRecentActivities(libraryStats.recent_activities || []);
-            } catch (fallbackError) {
-                console.error('Fallback also failed:', fallbackError);
-            }
+            setRecentActivities([]);
         } finally {
             setLoading(false);
         }
@@ -170,47 +159,6 @@ const Dashboard = () => {
                         আমার বই দেখুন →
                     </Link>
                 </Card>
-            </div>
-
-            {/* Quick Stats */}
-            <div>
-                <h2 className={`text-xl font-semibold ${colorClasses.text.primary} mb-6`}>দ্রুত পরিসংখ্যান</h2>
-                {loading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {[1, 2, 3, 4].map((i) => (
-                            <Card key={i} className="animate-pulse">
-                                <div className="h-20 bg-gray-200 rounded"></div>
-                            </Card>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <StatsCard
-                            value={stats?.total_books ? `${stats.total_books}+` : "১৫০+"}
-                            label="উপলব্ধ বই"
-                            icon={BookOpen}
-                            color="green"
-                        />
-                        <StatsCard
-                            value={stats?.borrowed_books ? `${stats.borrowed_books}` : "২৫"}
-                            label="ধার নেওয়া বই"
-                            icon={Book}
-                            color="blue"
-                        />
-                        <StatsCard
-                            value={stats?.total_books ? `${Math.floor(stats.total_books * 0.1)}` : "১২"}
-                            label="দান করা বই"
-                            icon={Gift}
-                            color="purple"
-                        />
-                        <StatsCard
-                            value={stats?.total_users ? `${stats.total_users}+` : "৫০০+"}
-                            label="কমিউনিটি সদস্য"
-                            icon={Users}
-                            color="orange"
-                        />
-                    </div>
-                )}
             </div>
 
             {/* Recent Activity */}

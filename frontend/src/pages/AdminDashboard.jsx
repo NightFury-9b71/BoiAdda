@@ -16,7 +16,7 @@ import {
   BookMarked,
   Gift
 } from 'lucide-react';
-import { PageHeader, Card, Button, Input, Badge, EmptyState, LoadingSpinner } from '../components/ui/ThemeComponents.jsx';
+import { PageHeader, Card, Button, Input, Badge, EmptyState, LoadingSpinner, StatsCard, Modal } from '../components/ui/ThemeComponents.jsx';
 import { colorClasses } from '../styles/colors.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import api from '../api.js';
@@ -37,6 +37,11 @@ const AdminDashboard = () => {
   const [showBookModal, setShowBookModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedBook, setSelectedBook] = useState(null);
+  const [libraryStats, setLibraryStats] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [modalData, setModalData] = useState(null);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalLoading, setModalLoading] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -46,17 +51,228 @@ const AdminDashboard = () => {
   const loadRequests = async () => {
     setLoading(true);
     try {
-      const [borrowReqs, donationReqs] = await Promise.all([
+      const [borrowReqs, donationReqs, libStats] = await Promise.all([
         api.getBorrowRequests(),
-        api.getDonationRequests()
+        api.getDonationRequests(),
+        api.getLibraryStatistics()
       ]);
       setBorrowRequests(borrowReqs);
       setDonationRequests(donationReqs);
+      setLibraryStats(libStats);
     } catch (error) {
       console.error('Error loading requests:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleStatsCardClick = async (type) => {
+    setModalLoading(true);
+    setShowModal(true);
+    
+    try {
+      let data = [];
+      let title = '';
+      
+      switch (type) {
+        case 'books':
+          data = await api.getDetailedBooks();
+          title = 'সকল বই';
+          break;
+        case 'available_books':
+          data = await api.getDetailedAvailableBooks();
+          title = 'উপলব্ধ বই';
+          break;
+        case 'users':
+          data = await api.getDetailedUsers();
+          title = 'সকল ব্যবহারকারী';
+          break;
+        case 'borrowed':
+          data = await api.getDetailedBorrowedBooks();
+          title = 'ধার নেওয়া বই';
+          break;
+        case 'donations':
+          data = await api.getDetailedDonations();
+          title = 'দানকৃত বই';
+          break;
+        case 'active_users':
+          const allUsers = await api.getDetailedUsers();
+          data = allUsers.filter(user => user.is_active);
+          title = 'সক্রিয় ব্যবহারকারী';
+          break;
+        case 'new_users':
+          const allUsersForNew = await api.getDetailedUsers();
+          data = allUsersForNew.filter(user => user.is_new);
+          title = 'নতুন ব্যবহারকারী';
+          break;
+        default:
+          data = [];
+          title = 'তথ্য';
+      }
+      
+      setModalData(data);
+      setModalTitle(title);
+    } catch (error) {
+      console.error('Error loading modal data:', error);
+      setModalData([]);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const renderModalContent = () => {
+    if (modalLoading) {
+      return (
+        <div className="flex justify-center items-center py-8">
+          <LoadingSpinner size="lg" />
+        </div>
+      );
+    }
+
+    if (!modalData || modalData.length === 0) {
+      return (
+        <div className="text-center py-8">
+          <p className={colorClasses.text.secondary}>কোন তথ্য পাওয়া যায়নি</p>
+        </div>
+      );
+    }
+
+    // Render different content based on modal title
+    if (modalTitle === 'সকল বই' || modalTitle === 'উপলব্ধ বই') {
+      return (
+        <div className="space-y-4">
+          {modalData.map((book) => (
+            <div key={book.id} className={`p-4 border rounded-lg ${colorClasses.border.primary}`}>
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <h4 className={`font-semibold ${colorClasses.text.primary}`}>{book.title}</h4>
+                  <p className={colorClasses.text.secondary}>লেখক: {book.author}</p>
+                  <p className={colorClasses.text.secondary}>বিভাগ: {book.category}</p>
+                  <p className={colorClasses.text.secondary}>দাতা: {book.donor_name}</p>
+                </div>
+                <div className="text-right">
+                  <div className={`text-sm ${colorClasses.text.secondary}`}>
+                    মোট কপি: {book.total_copies}
+                  </div>
+                  <div className={`text-sm ${colorClasses.text.success}`}>
+                    উপলব্ধ: {book.available_copies}
+                  </div>
+                  <div className={`text-sm ${colorClasses.text.warning}`}>
+                    ধার: {book.borrowed_copies}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (modalTitle === 'সকল ব্যবহারকারী' || modalTitle === 'সক্রিয় ব্যবহারকারী' || modalTitle === 'নতুন ব্যবহারকারী') {
+      return (
+        <div className="space-y-4">
+          {modalData.map((user) => (
+            <div key={user.id} className={`p-4 border rounded-lg ${colorClasses.border.primary}`}>
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <h4 className={`font-semibold ${colorClasses.text.primary}`}>{user.name}</h4>
+                  <p className={colorClasses.text.secondary}>ইমেইল: {user.email}</p>
+                  <p className={colorClasses.text.secondary}>ফোন: {user.phone || 'নেই'}</p>
+                  <p className={colorClasses.text.secondary}>ভূমিকা: {user.role_name}</p>
+                  <p className={colorClasses.text.secondary}>
+                    যোগদানের তারিখ: {new Date(user.created_at).toLocaleDateString('bn-BD')}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className={`text-sm ${colorClasses.text.secondary}`}>
+                    মোট ধার: {user.total_borrowed}
+                  </div>
+                  <div className={`text-sm ${colorClasses.text.warning}`}>
+                    বর্তমান ধার: {user.current_borrowed}
+                  </div>
+                  <div className={`text-sm ${colorClasses.text.info}`}>
+                    মোট দান: {user.total_donated}
+                  </div>
+                  {user.is_new && (
+                    <Badge variant="info" size="sm">নতুন</Badge>
+                  )}
+                  {user.is_active && (
+                    <Badge variant="success" size="sm">সক্রিয়</Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (modalTitle === 'ধার নেওয়া বই') {
+      return (
+        <div className="space-y-4">
+          {modalData.map((borrow) => (
+            <div key={borrow.transaction_id} className={`p-4 border rounded-lg ${colorClasses.border.primary} ${borrow.is_overdue ? 'border-red-300 bg-red-50' : ''}`}>
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <h4 className={`font-semibold ${colorClasses.text.primary}`}>{borrow.book_title}</h4>
+                  <p className={colorClasses.text.secondary}>লেখক: {borrow.book_author}</p>
+                  <p className={colorClasses.text.secondary}>ধারকারী: {borrow.user_name}</p>
+                  <p className={colorClasses.text.secondary}>ইমেইল: {borrow.user_email}</p>
+                </div>
+                <div className="text-right">
+                  <div className={`text-sm ${colorClasses.text.secondary}`}>
+                    ধারের তারিখ: {new Date(borrow.borrowed_date).toLocaleDateString('bn-BD')}
+                  </div>
+                  <div className={`text-sm ${borrow.is_overdue ? 'text-red-600' : colorClasses.text.secondary}`}>
+                    ফেরতের তারিখ: {new Date(borrow.due_date).toLocaleDateString('bn-BD')}
+                  </div>
+                  <div className={`text-sm ${colorClasses.text.secondary}`}>
+                    {borrow.is_overdue ? `${Math.abs(borrow.days_until_due)} দিন বিলম্ব` : `${borrow.days_until_due} দিন বাকি`}
+                  </div>
+                  {borrow.is_overdue && (
+                    <Badge variant="error" size="sm">মেয়াদোত্তীর্ণ</Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (modalTitle === 'দানকৃত বই') {
+      return (
+        <div className="space-y-4">
+          {modalData.map((donation) => (
+            <div key={donation.transaction_id} className={`p-4 border rounded-lg ${colorClasses.border.primary}`}>
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <h4 className={`font-semibold ${colorClasses.text.primary}`}>{donation.book_title}</h4>
+                  <p className={colorClasses.text.secondary}>লেখক: {donation.book_author}</p>
+                  <p className={colorClasses.text.secondary}>বিভাগ: {donation.book_category}</p>
+                  <p className={colorClasses.text.secondary}>দাতা: {donation.donor_name}</p>
+                  {donation.admin_comment && (
+                    <p className={`text-sm ${colorClasses.text.tertiary} mt-2`}>
+                      মন্তব্য: {donation.admin_comment}
+                    </p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <div className={`text-sm ${colorClasses.text.secondary}`}>
+                    দানের তারিখ: {new Date(donation.donation_date).toLocaleDateString('bn-BD')}
+                  </div>
+                  <div className={`text-sm ${colorClasses.text.success}`}>
+                    কপি যোগ: {donation.copies_added}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return <div>Unknown data type</div>;
   };
 
   const handleAction = (request, action) => {
@@ -98,7 +314,7 @@ const AdminDashboard = () => {
           await api.approveDonation({
             txId: requestId,
             adminId: user.id,
-            comment: adminComment
+            comment: adminComment 
           });
         } else {
           await api.rejectDonation({
@@ -547,32 +763,97 @@ const AdminDashboard = () => {
         </div>
       ) : (
         <>
-          {/* Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <div className="text-center p-4">
-                <div className={`text-2xl font-bold ${colorClasses.text.accent}`}>
-                  {totalPendingRequests}
+          {/* Library Statistics */}
+          <div>
+            <h2 className={`text-xl font-semibold ${colorClasses.text.primary} mb-6`}>লাইব্রেরি পরিসংখ্যান</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <StatsCard
+                value={libraryStats?.total_books || "0"}
+                label="মোট বই"
+                icon={BookOpen}
+                color="green"
+                onClick={() => handleStatsCardClick('books')}
+              />
+              <StatsCard
+                value={libraryStats?.available_books || "0"}
+                label="উপলব্ধ বই"
+                icon={BookMarked}
+                color="blue"
+                onClick={() => handleStatsCardClick('available_books')}
+              />
+              <StatsCard
+                value={libraryStats?.borrowed_books || "0"}
+                label="ধার নেওয়া বই"
+                icon={Calendar}
+                color="orange"
+                onClick={() => handleStatsCardClick('borrowed')}
+              />
+              <StatsCard
+                value={libraryStats?.total_users || "0"}
+                label="মোট ব্যবহারকারী"
+                icon={Users}
+                color="purple"
+                onClick={() => handleStatsCardClick('users')}
+              />
+              <StatsCard
+                value={libraryStats?.active_users || "0"}
+                label="সক্রিয় ব্যবহারকারী"
+                icon={UserIcon}
+                color="green"
+                onClick={() => handleStatsCardClick('active_users')}
+              />
+              <StatsCard
+                value={libraryStats?.new_users || "0"}
+                label="নতুন ব্যবহারকারী"
+                icon={TrendingUp}
+                color="blue"
+                onClick={() => handleStatsCardClick('new_users')}
+              />
+              <StatsCard
+                value={libraryStats?.total_donations || "0"}
+                label="মোট দান"
+                icon={Gift}
+                color="purple"
+                onClick={() => handleStatsCardClick('donations')}
+              />
+              <StatsCard
+                value={totalPendingRequests}
+                label="অপেক্ষমাণ অনুরোধ"
+                icon={Clock}
+                color="orange"
+              />
+            </div>
+          </div>
+
+          {/* Request Management Statistics */}
+          <div>
+            <h3 className={`text-lg font-semibold ${colorClasses.text.primary} mb-4`}>অনুরোধ ব্যবস্থাপনা</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <div className="text-center p-4">
+                  <div className={`text-2xl font-bold ${colorClasses.text.accent}`}>
+                    {totalPendingRequests}
+                  </div>
+                  <div className={`text-sm ${colorClasses.text.secondary}`}>মোট অপেক্ষমাণ</div>
                 </div>
-                <div className={`text-sm ${colorClasses.text.secondary}`}>মোট অপেক্ষমাণ</div>
-              </div>
-            </Card>
-            <Card>
-              <div className="text-center p-4">
-                <div className={`text-2xl font-bold ${colorClasses.text.primary}`}>
-                  {totalBorrowRequests}
+              </Card>
+              <Card>
+                <div className="text-center p-4">
+                  <div className={`text-2xl font-bold ${colorClasses.text.primary}`}>
+                    {totalBorrowRequests}
+                  </div>
+                  <div className={`text-sm ${colorClasses.text.secondary}`}>ধার নেওয়ার অনুরোধ</div>
                 </div>
-                <div className={`text-sm ${colorClasses.text.secondary}`}>ধার নেওয়ার অনুরোধ</div>
-              </div>
-            </Card>
-            <Card>
-              <div className="text-center p-4">
-                <div className={`text-2xl font-bold ${colorClasses.text.primary}`}>
-                  {totalDonationRequests}
+              </Card>
+              <Card>
+                <div className="text-center p-4">
+                  <div className={`text-2xl font-bold ${colorClasses.text.primary}`}>
+                    {totalDonationRequests}
+                  </div>
+                  <div className={`text-sm ${colorClasses.text.secondary}`}>দানের অনুরোধ</div>
                 </div>
-                <div className={`text-sm ${colorClasses.text.secondary}`}>দানের অনুরোধ</div>
-              </div>
-            </Card>
+              </Card>
+            </div>
           </div>
 
           {/* Tabs */}
@@ -644,6 +925,16 @@ const AdminDashboard = () => {
           )}
         </>
       )}
+
+      {/* Statistics Modal */}
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title={modalTitle}
+        size="lg"
+      >
+        {renderModalContent()}
+      </Modal>
 
       {/* Modals */}
       <UserDetailsModal />

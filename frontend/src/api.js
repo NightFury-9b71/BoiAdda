@@ -31,6 +31,16 @@ const api = {
     return response.data;
   },
 
+  getUserProfile: async (userId) => {
+    const response = await apiClient.get(`/auth/me?user_id=${userId}`);
+    return response.data;
+  },
+
+  getAllUsers: async () => {
+    const response = await apiClient.get('/users/');
+    return response.data;
+  },
+
   getBooks: async () => {
     const response = await apiClient.get('/books/');
     return response.data;
@@ -41,8 +51,8 @@ const api = {
     return response.data;
   },
 
-  donateBook: async ({ bookId, userId }) => {
-    const response = await apiClient.post(`/donate/${bookId}`, { user_id: userId });
+  donateBook: async (bookData) => {
+    const response = await apiClient.post('/donate', bookData);
     return response.data;
   },
 
@@ -103,76 +113,14 @@ const api = {
     return response.data;
   },
 
-  // Mock APIs
-  getBorrowedBooks: async (userId) => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return [
-      {
-        id: 1,
-        title: "The Great Gatsby",
-        author: "F. Scott Fitzgerald",
-        cover_img: "https://example.com/gatsby.jpg",
-        borrowed_date: "2025-07-01",
-        due_date: "2025-08-01",
-        status: "active"
-      },
-      {
-        id: 2,
-        title: "1984",
-        author: "George Orwell",
-        cover_img: "https://example.com/1984.jpg",
-        borrowed_date: "2025-07-15",
-        due_date: "2025-08-15",
-        status: "overdue"
-      }
-    ];
-  },
-
-  getHistory: async (userId) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return [
-      {
-        id: 1,
-        type: "borrow",
-        book_title: "To Kill a Mockingbird",
-        date: "2025-06-15",
-        status: "returned",
-        return_date: "2025-07-15"
-      },
-      {
-        id: 2,
-        type: "donation",
-        book_title: "Pride and Prejudice",
-        date: "2025-06-01",
-        status: "approved"
-      }
-    ];
-  },
-
   getNotifications: async (userId) => {
     try {
       const response = await apiClient.get(`/users/${userId}/notifications`);
       return response.data;
     } catch (error) {
       console.error('Error fetching notifications:', error);
-      // Return mock notifications as fallback
-      return [
-        {
-          id: 1,
-          type: "due_date",
-          message: "আপনার ধার নেওয়া বই 'The Great Gatsby' আগামীকাল ফেরত দিতে হবে",
-          timestamp: "2025-08-12T10:00:00",
-          read: false
-        },
-        {
-          id: 2,
-          type: "request_approved",
-          message: "আপনার দান করার অনুরোধ 'Pride and Prejudice' অনুমোদিত হয়েছে",
-          timestamp: "2025-08-11T15:30:00",
-          read: true
-        }
-      ];
+      // Return empty array as fallback
+      return [];
     }
   },
 
@@ -186,94 +134,17 @@ const api = {
     }
   },
 
-  getUserProfile: async (userId) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return {
-      id: 3,
-      name: "John Doe",
-      email: "john@example.com",
-      joined_date: "2025-01-01",
-      total_borrowed: 15,
-      total_donated: 3,
-      reading_streak: 7
-    };
-  },
-
-  // New mock data and methods
   getAllBooks: async () => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return [
-      {
-        id: 1,
-        title: "The Great Gatsby",
-        author: "F. Scott Fitzgerald",
-        cover_img: "https://example.com/gatsby.jpg",
-        total_copies: 5,
-        available_copies: 3
-      },
-      {
-        id: 2,
-        title: "1984",
-        author: "George Orwell",
-        cover_img: "https://example.com/1984.jpg",
-        total_copies: 4,
-        available_copies: 0
-      },
-      {
-        id: 3,
-        title: "Moby Dick",
-        author: "Herman Melville",
-        cover_img: "https://example.com/mobydick.jpg",
-        total_copies: 2,
-        available_copies: 2
-      }
-    ];
-  },
-
-  getAllUsers: async () => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return [
-      {
-        id: 1,
-        name: "John Doe",
-        email: "john@example.com",
-        borrowed_count: 3
-      },
-      {
-        id: 2,
-        name: "Jane Smith",
-        email: "jane@example.com",
-        borrowed_count: 5
-      },
-      {
-        id: 3,
-        name: "Alice Johnson",
-        email: "alice@example.com",
-        borrowed_count: 0
-      }
-    ];
-  },
-
-  getLibraryStats: async () => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Get real recent activities from the backend
-    const recentActivitiesResponse = await apiClient.get('/recent-activities?limit=10');
-    
-    return {
-      total_books: 1247,
-      borrowed_books: 423,
-      available_books: 824,
-      total_users: 345,
-      active_users: 89,
-      new_users: 12,
-      recent_activities: recentActivitiesResponse.data
-    };
+    const response = await apiClient.get('/books/');
+    return response.data;
   },
 
   addBook: async (bookData) => {
+    // TODO: Backend endpoint needed for admin book addition
+    // Currently only donation endpoint exists: POST /donate
+    // This is a placeholder for admin "add book directly" functionality
     await new Promise(resolve => setTimeout(resolve, 1000));
-    return { success: true };
+    return { success: true, message: "Book addition feature needs backend implementation" };
   },
 
   getRecentActivities: async (limit = 10) => {
@@ -284,6 +155,76 @@ const api = {
   getUserRecentActivities: async (userId, limit = 10, days = 7) => {
     const response = await apiClient.get(`/users/${userId}/recent-activities?limit=${limit}&days=${days}`);
     return response.data;
+  },
+
+  getLibraryStatistics: async () => {
+    try {
+      const response = await apiClient.get('/library/statistics');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching library statistics:', error);
+      // Return fallback data
+      return {
+        total_books: 0,
+        available_books: 0,
+        borrowed_books: 0,
+        total_users: 0,
+        active_users: 0,
+        new_users: 0,
+        total_donations: 0
+      };
+    }
+  },
+
+  // Admin detailed statistics endpoints
+  getDetailedBooks: async () => {
+    try {
+      const response = await apiClient.get('/admin/books/detailed');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching detailed books:', error);
+      return [];
+    }
+  },
+
+  getDetailedUsers: async () => {
+    try {
+      const response = await apiClient.get('/admin/users/detailed');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching detailed users:', error);
+      return [];
+    }
+  },
+
+  getDetailedBorrowedBooks: async () => {
+    try {
+      const response = await apiClient.get('/admin/borrowed-books/detailed');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching detailed borrowed books:', error);
+      return [];
+    }
+  },
+
+  getDetailedDonations: async () => {
+    try {
+      const response = await apiClient.get('/admin/donations/detailed');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching detailed donations:', error);
+      return [];
+    }
+  },
+
+  getDetailedAvailableBooks: async () => {
+    try {
+      const response = await apiClient.get('/admin/available-books/detailed');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching detailed available books:', error);
+      return [];
+    }
   },
 };
 
