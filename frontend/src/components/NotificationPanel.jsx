@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, Check, X, Clock, CheckCircle, Gift, BookOpen } from 'lucide-react';
+import { Bell, Check, X, Clock, CheckCircle, Gift, BookOpen, Megaphone, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { colorClasses } from '../styles/colors.js';
 import api from '../api.js';
@@ -58,6 +58,12 @@ const NotificationPanel = ({ isOpen, onClose }) => {
         return <Gift className="h-4 w-4 text-red-500" />;
       case 'welcome':
         return <CheckCircle className="h-4 w-4 text-blue-500" />;
+      case 'announcement_urgent':
+        return <AlertTriangle className="h-4 w-4 text-red-600" />;
+      case 'announcement_important':
+        return <Megaphone className="h-4 w-4 text-orange-500" />;
+      case 'announcement':
+        return <Megaphone className="h-4 w-4 text-blue-500" />;
       case 'due_date':
         return <Clock className="h-4 w-4 text-orange-500" />;
       case 'request_approved':
@@ -86,6 +92,12 @@ const NotificationPanel = ({ isOpen, onClose }) => {
       case 'donation_rejected':
         return 'error'; // Red background
       case 'welcome':
+        return 'info'; // Blue background
+      case 'announcement_urgent':
+        return 'high'; // Red background
+      case 'announcement_important':
+        return 'medium'; // Orange background
+      case 'announcement':
         return 'info'; // Blue background
       default:
         return 'normal'; // Default background

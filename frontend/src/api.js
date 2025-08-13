@@ -9,6 +9,20 @@ const apiClient = axios.create({
   },
 });
 
+// Add a request interceptor to include authorization header
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 const api = {
   // Authentication endpoints
   register: async (userData) => {
@@ -131,6 +145,47 @@ const api = {
     } catch (error) {
       console.error('Error marking notification as read:', error);
       return { success: false };
+    }
+  },
+
+  // Announcement API
+  createAnnouncement: async (announcementData) => {
+    try {
+      const response = await apiClient.post('/admin/announcements', announcementData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating announcement:', error);
+      throw error;
+    }
+  },
+
+  getAllAnnouncements: async () => {
+    try {
+      const response = await apiClient.get('/admin/announcements');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching announcements:', error);
+      throw error;
+    }
+  },
+
+  toggleAnnouncement: async (announcementId) => {
+    try {
+      const response = await apiClient.put(`/admin/announcements/${announcementId}/toggle`);
+      return response.data;
+    } catch (error) {
+      console.error('Error toggling announcement:', error);
+      throw error;
+    }
+  },
+
+  deleteAnnouncement: async (announcementId) => {
+    try {
+      const response = await apiClient.delete(`/admin/announcements/${announcementId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting announcement:', error);
+      throw error;
     }
   },
 

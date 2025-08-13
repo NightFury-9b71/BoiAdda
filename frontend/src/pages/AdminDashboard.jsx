@@ -14,11 +14,13 @@ import {
   FileText,
   TrendingUp,
   BookMarked,
-  Gift
+  Gift,
+  Megaphone
 } from 'lucide-react';
 import { PageHeader, Card, Button, Input, Badge, EmptyState, LoadingSpinner, StatsCard, Modal } from '../components/ui/ThemeComponents.jsx';
 import { colorClasses } from '../styles/colors.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import AnnouncementManager from '../components/AnnouncementManager.jsx';
 import api from '../api.js';
 
 const AdminDashboard = () => {
@@ -519,6 +521,12 @@ const AdminDashboard = () => {
       label: 'দানের অনুরোধ',
       count: totalDonationRequests,
       icon: Gift
+    },
+    {
+      id: 'announcements',
+      label: 'ঘোষণা ব্যবস্থাপনা',
+      count: null,
+      icon: Megaphone
     }
   ];
 
@@ -871,57 +879,66 @@ const AdminDashboard = () => {
                 >
                   <tab.icon className="h-4 w-4 mr-2" />
                   {tab.label}
-                  <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
-                    activeTab === tab.id
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}>
-                    {tab.count}
-                  </span>
+                  {tab.count !== null && (
+                    <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
+                      activeTab === tab.id
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {tab.count}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
           </Card>
 
-          {/* Search */}
-          <Card>
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <Input
-                  icon={Search}
-                  placeholder="ব্যবহারকারী বা বইয়ের নাম খুঁজুন..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-          </Card>
-
-          {/* Requests List */}
-          {filteredRequests.length === 0 ? (
-            <EmptyState
-              icon={activeTab === 'borrow-requests' ? BookOpen : Gift}
-              title="কোন অনুরোধ পাওয়া যায়নি"
-              description={
-                searchTerm 
-                  ? "আপনার অনুসন্ধানের সাথে মিলে এমন কোন অনুরোধ পাওয়া যায়নি।"
-                  : activeTab === 'borrow-requests'
-                  ? "কোন ধার নেওয়ার অনুরোধ নেই।"
-                  : "কোন দানের অনুরোধ নেই।"
-              }
-            />
+          {/* Tab Content */}
+          {activeTab === 'announcements' ? (
+            <AnnouncementManager />
           ) : (
-            <div className="space-y-4">
-              <p className={`text-sm ${colorClasses.text.secondary}`}>
-                {filteredRequests.length} টি অনুরোধ পাওয়া গেছে
-              </p>
-              
-              <div className="grid gap-4">
-                {filteredRequests.map((request) => (
-                  <RequestCard key={`${activeTab}_${request.id}`} request={request} />
-                ))}
-              </div>
-            </div>
+            <>
+              {/* Search */}
+              <Card>
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                    <Input
+                      icon={Search}
+                      placeholder="ব্যবহারকারী বা বইয়ের নাম খুঁজুন..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </Card>
+
+              {/* Requests List */}
+              {filteredRequests.length === 0 ? (
+                <EmptyState
+                  icon={activeTab === 'borrow-requests' ? BookOpen : Gift}
+                  title="কোন অনুরোধ পাওয়া যায়নি"
+                  description={
+                    searchTerm 
+                      ? "আপনার অনুসন্ধানের সাথে মিলে এমন কোন অনুরোধ পাওয়া যায়নি।"
+                      : activeTab === 'borrow-requests'
+                      ? "কোন ধার নেওয়ার অনুরোধ নেই।"
+                      : "কোন দানের অনুরোধ নেই।"
+                  }
+                />
+              ) : (
+                <div className="space-y-4">
+                  <p className={`text-sm ${colorClasses.text.secondary}`}>
+                    {filteredRequests.length} টি অনুরোধ পাওয়া গেছে
+                  </p>
+                  
+                  <div className="grid gap-4">
+                    {filteredRequests.map((request) => (
+                      <RequestCard key={`${activeTab}_${request.id}`} request={request} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </>
       )}

@@ -1618,6 +1618,22 @@ class Notification(BaseModel):
     timestamp: str
     read: bool
 
+class AnnouncementCreate(BaseModel):
+    title: str
+    message: str
+    priority: str = "normal"  # "high", "medium", "normal"
+    target_users: Optional[List[int]] = None  # None for broadcast, list of user IDs for targeted
+
+class AnnouncementResponse(BaseModel):
+    id: int
+    title: str
+    message: str
+    priority: str
+    created_by: str  # admin name
+    created_at: datetime
+    is_active: bool
+    target_users: Optional[List[int]] = None  # None for broadcast, list of user IDs for targeted
+
 @app.get("/users/{user_id}/notifications", response_model=List[Notification], tags=["public"])
 def get_user_notifications(user_id: int, db: Session = Depends(get_db)):
     """Get real notifications for a specific user based on their activity"""
@@ -1788,6 +1804,35 @@ def get_user_notifications(user_id: int, db: Session = Depends(get_db)):
         ))
         notification_id += 1
     
+    # 8. Active announcements (last 30 days)
+    cutoff_date_announcements = datetime.now() - timedelta(days=30)
+    for announcement in announcements_storage:
+        if (announcement["is_active"] and 
+            announcement["created_at"] >= cutoff_date_announcements):
+            
+            # Check if this announcement is for this user
+            target_users = announcement.get("target_users")
+            if target_users is not None and user_id not in target_users:
+                continue  # Skip this announcement for this user
+            
+            announcement_notification_id = 10000 + announcement["id"]  # Unique ID for announcements
+            
+            # Determine announcement type based on priority
+            if announcement["priority"] == "high":
+                announcement_type = "announcement_urgent"
+            elif announcement["priority"] == "medium":
+                announcement_type = "announcement_important"
+            else:
+                announcement_type = "announcement"
+            
+            notifications.append(Notification(
+                id=announcement_notification_id,
+                type=announcement_type,
+                message=f"📢 {announcement['title']}: {announcement['message']}",
+                timestamp=announcement["created_at"].isoformat(),
+                read=is_notification_read(user_id, announcement_notification_id)
+            ))
+    
     # Sort by timestamp (newest first)
     notifications.sort(key=lambda x: datetime.fromisoformat(x.timestamp), reverse=True)
     
@@ -1795,6 +1840,10 @@ def get_user_notifications(user_id: int, db: Session = Depends(get_db)):
 
 # ===== NOTIFICATION STORAGE (In-memory for now) =====
 notification_read_status = {}  # {user_id: set(notification_ids)}
+
+# ===== ANNOUNCEMENT STORAGE (In-memory for now) =====
+announcements_storage = []  # List of announcements
+announcement_counter = 1
 
 def mark_notification_read(user_id: int, notification_id: int):
     """Mark a notification as read for a user"""
@@ -1815,6 +1864,122 @@ def mark_notification_as_read(notification_id: int, current_user_id: int = Depen
     except Exception as e:
         logger.error(f"Error marking notification as read: {e}")
         return {"success": False, "message": "Failed to mark notification as read"}
+
+# ===== ANNOUNCEMENT ROUTES =====
+
+@app.post("/admin/announcements", response_model=AnnouncementResponse, tags=["admin"])
+def create_announcement(
+    announcement: AnnouncementCreate, 
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Create a new announcement (admin only)"""
+    global announcement_counter
+    
+    # Check if user is admin
+    user_with_role = db.exec(
+        select(User, Role).join(Role, User.role_id == Role.id).where(User.id == current_user_id)
+    ).first()
+    
+    if not user_with_role:
+        raise HTTPException(404, detail="User not found")
+    
+    user_obj, role_obj = user_with_role
+    
+    if role_obj.role_name != RoleType.ADMIN:
+        raise HTTPException(403, detail="Only admins can create announcements")
+    
+    # Create announcement
+    new_announcement = {
+        "id": announcement_counter,
+        "title": announcement.title,
+        "message": announcement.message,
+        "priority": announcement.priority,
+        "created_by": user_obj.name,
+        "created_at": datetime.now(),
+        "is_active": True,
+        "target_users": announcement.target_users  # None for broadcast, list for targeted
+    }
+    
+    announcements_storage.append(new_announcement)
+    announcement_counter += 1
+    
+    return AnnouncementResponse(**new_announcement)
+
+@app.get("/admin/announcements", response_model=List[AnnouncementResponse], tags=["admin"])
+def get_all_announcements(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Get all announcements (admin only)"""
+    # Check if user is admin
+    user_with_role = db.exec(
+        select(User, Role).join(Role, User.role_id == Role.id).where(User.id == current_user_id)
+    ).first()
+    
+    if not user_with_role:
+        raise HTTPException(404, detail="User not found")
+    
+    user_obj, role_obj = user_with_role
+    
+    if role_obj.role_name != RoleType.ADMIN:
+        raise HTTPException(403, detail="Only admins can view all announcements")
+    
+    return [AnnouncementResponse(**ann) for ann in announcements_storage]
+
+@app.put("/admin/announcements/{announcement_id}/toggle", tags=["admin"])
+def toggle_announcement(
+    announcement_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Toggle announcement active status (admin only)"""
+    # Check if user is admin
+    user_with_role = db.exec(
+        select(User, Role).join(Role, User.role_id == Role.id).where(User.id == current_user_id)
+    ).first()
+    
+    if not user_with_role:
+        raise HTTPException(404, detail="User not found")
+    
+    user_obj, role_obj = user_with_role
+    
+    if role_obj.role_name != RoleType.ADMIN:
+        raise HTTPException(403, detail="Only admins can toggle announcements")
+    
+    # Find and toggle announcement
+    for announcement in announcements_storage:
+        if announcement["id"] == announcement_id:
+            announcement["is_active"] = not announcement["is_active"]
+            return {"success": True, "message": f"Announcement {'activated' if announcement['is_active'] else 'deactivated'}"}
+    
+    raise HTTPException(404, detail="Announcement not found")
+
+@app.delete("/admin/announcements/{announcement_id}", tags=["admin"])
+def delete_announcement(
+    announcement_id: int,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Delete an announcement (admin only)"""
+    global announcements_storage
+    
+    # Check if user is admin
+    user_with_role = db.exec(
+        select(User, Role).join(Role, User.role_id == Role.id).where(User.id == current_user_id)
+    ).first()
+    
+    if not user_with_role:
+        raise HTTPException(404, detail="User not found")
+    
+    user_obj, role_obj = user_with_role
+    
+    if role_obj.role_name != RoleType.ADMIN:
+        raise HTTPException(403, detail="Only admins can delete announcements")
+    
+    # Find and remove announcement
+    announcements_storage = [ann for ann in announcements_storage if ann["id"] != announcement_id]
+    return {"success": True, "message": "Announcement deleted"}
 
 # ===== UTILITY ROUTES =====
 
