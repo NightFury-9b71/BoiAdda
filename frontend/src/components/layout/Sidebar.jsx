@@ -22,7 +22,7 @@ const Sidebar = () => {
     const navItems = [
         { label: "ড্যাশবোর্ড", path: "/", icon: Home },
         { label: "বই সংগ্রহ", path: "/books", icon: BookOpen },
-        { label: "খুঁজুন", path: "/search", icon: Search },
+        // { label: "খুঁজুন", path: "/search", icon: Search },
         { label: "বই দান", path: "/donate", icon: Gift },
         { label: "আমার বই", path: "/my-books", icon: Book },
         { label: "প্রোফাইল", path: "/profile", icon: User },

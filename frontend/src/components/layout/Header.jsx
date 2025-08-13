@@ -35,7 +35,7 @@ const Header = () => {
 
     return (
         <header className={`flex justify-between items-center w-full p-4 ${colorClasses.bg.primary} shadow-sm border-b ${colorClasses.border.primary}`}>
-            <div className={`text-xl font-bold ${colorClasses.text.accent}`}>
+            <div className={`text-xl font-bold ${colorClasses.text.accent} ml-12`}>
                 বই আড্ডা
             </div>
 
